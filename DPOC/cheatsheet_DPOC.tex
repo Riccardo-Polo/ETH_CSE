@@ -1,0 +1,288 @@
+\documentclass[8pt,a4paper]{article}
+\usepackage[landscape]{geometry}
+\usepackage{url}
+\usepackage{multicol}
+\usepackage{amsmath}
+\usepackage{esint}
+\usepackage{amsfonts}
+\usepackage{tikz}
+\usetikzlibrary{decorations.pathmorphing}
+\usepackage{amsmath,amssymb}
+
+\usepackage{colortbl}
+\usepackage{xcolor}
+\usepackage{mathtools}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\makeatletter
+
+\newcommand*\bigcdot{\mathpalette\bigcdot@{.5}}
+\newcommand*\bigcdot@[2]{\mathbin{\vcenter{\hbox{\scalebox{#2}{$\m@th#1\bullet$}}}}}
+\makeatother
+
+\title{130 Cheat Sheet}
+\usepackage[brazilian]{babel}
+\usepackage[utf8]{inputenc}
+
+\advance\topmargin-.8in
+\advance\textheight3in
+\advance\textwidth3in
+\advance\oddsidemargin-1.5in
+\advance\evensidemargin-1.5in
+\parindent0pt
+\parskip2pt
+\newcommand{\hr}{\centerline{\rule{3.5in}{1pt}}}
+%\colorbox[HTML]{e4e4e4}{\makebox[\textwidth-2\fboxsep][l]{texto}
+\begin{document}
+
+%\begin{center}{\huge{\textbf{DPOC Cheat Sheet}}}\\
+%\end{center}
+\begin{multicols*}{3}
+
+\tikzstyle{mybox} = [draw=black, fill=white, very thick,
+    rectangle, rounded corners, inner sep=10pt, inner ysep=10pt]
+\tikzstyle{fancytitle} =[fill=black, text=white, font=\bfseries]
+
+%------------ Heating ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+    $x_{k+1} = f_k(x_k,u_k,w_k)\quad k=0,1,\dots,N-1$\\ $w_k$ r.v. cond indep with $x_l,u_l,w_l \; ,\; l<k$ given $x_k,u_k$ and $p(w_k|x_k,u_k)$\\
+    In general cost function is $\mathbb{E}_{(X_1,U_0,W_0|x_0)}[g_N(x_N) + \sum_{k=0}^{N-1}g_k(x_k,u_k,w_k)]$\\
+    \textbf{OPEN loop} fixed $\bar{u}_0,\dots,\bar{u}_{N-1}$ has $\prod_{k=0}^{N-1} N_u^k$ strats.\\
+    \textbf{CLOSED loop} $u_k = \mu_k (x_k)$, admiss policy is $\pi=(\mu_0(\cdot),\dots,\mu_{N-1}(\cdot))$. Expected closed loop cost ass with adm pol $\forall x \in S_0 \; \pi$ is $J_{\pi}(x) = \mathbb{E}_{(X_1,W_0|x_0=x)}[g_N(x_N) + \sum_{k=0}^{N-1} g_k(x_k,\mu_k(x_k),w_k)]$. Optimal cost is $J^\star(x) = J_{\pi^\star}(x)$. Total strategies $\prod_{k=0}^{N-1}(N_u^k)^{N_x^k}$\\
+    \textbf{Discr , Finite state} convienet express dynamics as $P_{ij}(u,k)$ and say $x_{k+1}=w_k$ where $p_{w_k|x_k,u_k}(j|i,u)=P_{ij}(u,k)$. Conversely given $x_{k+1}=f(..)$ and $p_{w_k|x_k,u_k}$ u get $P_{ij}(u,k) = \sum_{\bar{w}_k s.t. f_k(i,u,\bar{w}_k)=j}p_{w_k|x_k,u_k}(\bar{w}_k|i,u)$
+    \end{minipage}
+};
+%------------ Heating Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {Intro};
+\end{tikzpicture}
+
+%------------ Mixing ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+    Goal $\pi^\star = \text{argmin}_\pi J_\pi (x) \;\; \forall x\in S_0$\\
+    \textbf{Prc of Opt} let $\pi^\star$ , cons problem at $x\in S_i$ , then $\pi^\star_i = (\mu^\star_i (\cdot),\dots,\mu^\star_{N-1}(\cdot))$ is optimal.\\
+    \textbf{DPA}$\forall x\in S_0$, $J^\star(x) = J_0(x)$ given by: 1-$J_N = g_N(x) \forall x \in S_N$ 2- $J_k(x) = \text{min}_{u\in U_k(x)} \mathbb{E}_{(w_k|x_k=x,u_k=u)}[g_k(x_k,u_j,w_k) + J_{k+1}(f_k(...))] \forall x \in S_k , k= N-1,\dots , 0$ and if u take $u_k$ that minim $J_k$ u get an optim policy.
+    Total operts is $\sum_{k=0}^{N-1}N^k_x N^k_u + N^N_u$\\
+    \textbf{Time Lags} if $x_{k+1}=f_k(x_k,x_{k-1},u_k,u_{k-1},w_k)$ u augment the state $\tilde{x}_k = (x_k,y_k,s_k)$ where $y_k = x_{k-1}\quad s_k=u_{k-1}$ so augment $\tilde{f}_k = (f_k(x_k,y_k,u_k,s_k,w_k),x_k,u_k)$\\
+    \textbf{Correlated dist} $w_k = C_k y_{k+1} \quad y_{k+1} = A_k y_k + v_k\quad x_{k+1}=f_k(x_k,u_k,w_k)$. Augument $\tilde{x}_{k+1} = [x_{k+1},y_{k+1}]$\\
+    \textbf{Forecasts} distr of $w_k$ known when given $y_{k+1}=v_k$. Augment $\tilde{x}_k = (x_k,y_k)$ and $\tilde{w}_k = (w_k,v_k)$ so $p(\tilde{w}_k|\tilde{x}_k,u_k) = p(w_k|y_k)p(\nu_k)$
+    \end{minipage}
+};
+%------------ Mixing Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {DPA};
+\end{tikzpicture}
+
+
+%------------ Gram-Schmidt Content ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+    Consider \textbf{time invariant} setup ( exept for $\mu$, show later). Write DPA with $V_l(\cdot) = J_{N-l}(\cdot)$ assuming $V_l$ conv u get \textbf{Bellman Equation}
+    $J(x) = \text{min}_{u\in U(x)}\mathbb{E}_{(w|x=x,u=u)}[g(x,u,w) + J(f(x,u,w))]\quad J$is optimal. Diff solve $x\in S$ simult. 
+    \end{minipage}
+};
+%------------ Gram-Schmidt Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {Infinite Horizon};
+\end{tikzpicture}
+
+%------------ Variation of Parameters Content ---------------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+    \textbf{SSP} Finite state, time inv , trans prob. time inv (general setup are not time inv). \textbf{Assume} $\exists 0 \,|\, P_{00}(u)=1 \,,\, g(0,u,0)=0$ and $\exists$ at least 1 prop policy (proper= $P$ end in $0 > 0$) and all others have $i$ s.t. $J(i)=\infty$. \textbf{Theorem} $\forall \, V_0(1),\dots,V_0(n)$, generate $V_{l+1}(i) = \text{min}_{u\in U(i)} (q(i,u) + \sum_{j=1}^n P_{ij}(u)V_l(j)\, \forall i \in S^+$ where $q(i,u) = \mathbb{E}[g(x,u,w)]$ convergs to $J^\star(i) \forall i \in S^+$. Sats BE , sol. is unique and gives opt policy.
+    \end{minipage}
+};
+%------------ Variation of Parameters Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {Infinite Horizon};
+\end{tikzpicture}
+
+
+%------------ Variation of Parameters Content ---------------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+    Quadr stage cost $g(x,u) = qx^2 + ru^2$, lin dyn $f(x,u) = ax +bu$. Educ guess $J(x) = px^2$. If $b=0$ $p=\frac{q}{1-a^2}$ req $|a|<1$. If $b\not=0$ let $\gamma = r(1-a^2)-b^2 q$ then $p=\frac{-\gamma + \sqrt{\gamma^2+4b^2qr}}{2b^2}$
+    \end{minipage}
+};
+%------------ Variation of Parameters Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {LQR};
+\end{tikzpicture}
+
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+    \textbf{VI} apply DP recursion above . Requires $\infty$ iterations.\\
+    \textbf{PI} Under Ass1, $\forall$ prop $\mu$ the assoc $J_\mu = (J_\mu(1),\dots)$ is uniq sol of $J_\mu(i) = q(i,\mu(i))+\sum_j P_{ij}(\mu(i))J_\mu (j)$ (set of lin eqts). Sequence $V_{l+1} = (J_\mu(1),\dots)$ is uniq sol of $J_\mu(i) = q(i,\mu(i))+\sum_j P_{ij}(\mu(i))J_\mu (j)$ or you can do iterations: $V_{l+1}(i)=q(i,\mu(i))+\sum_j P_{ij}(\mu(i))V_l(j)$\\
+    \textbf{PI Algo} 1 : P Eval $J_{\mu^h}(i) = q(i,\mu^h(i))+\sum_j P_{ij}(\mu^h(i))J_{\mu^h}(j)$ 2: Impr $\mu^{h+1}(i)=\text{argmin}_{u\in U(i)} (q(i,u) + \sum_j  P_{ij}(u)J_{\mu^h}(j))$\\
+    \textbf{Reprehase VI} Stage 1: $V_{l+1}(i) = q(i,\mu^l(i)) + \sum_j P_{ij}(\mu^l(i))V_l(j) $ stage 2 $\mu^{l+1}(i) = \text{argmin}_u (q(i,u) + \sum_j P_{ij}(u)V_{l+1}(j))$
+    \textbf{Complx PI} stage 1 $O(n^3)$ , stage 2 $O(n^2p)$. Total $O(n^2(n+p))$ at each it.\\
+    \textbf{Compl VI} $O(n^2p)$ at each it.\\
+    \textbf{Gass Seidal Upd} for VI: use most recent $V(j)$ every time u can. Faster conv, less memory.\\
+    \textbf{Linear Algebra} Stage 1 PI is $J=G+PJ$ has uniq sol iff P not have eignvl = 1 iff policy is proper
+     \end{minipage}
+};
+%------------ Variation of Parameters Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {Solving BE};
+\end{tikzpicture}
+
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+Solution of maximize V $\sum_{i\in S^+}V(i)$ subj to $V(i)\leq (q(i,u)+\sum_{j=1}^n P_{ij}(u)V(j))\;\forall u \in U(i) \;\forall i \in S^+$ also solves BE of the SSP.\\
+Rewrite in can form minim in x $c^Tx$ subj to $Ax\leq b$. Do $x=[V(1),\dots,V(n)]^T $ $c= [-1,\dots,-1]^T$ and $A=[I-\alpha P(u_1),\dots,I-\alpha P(u_m)]^T$ and $b=[q(1,u_1),\dots,q(n,u_1),\dots]^T$ 
+     \end{minipage}
+};
+%------------ Variation of Parameters Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {Linear Programming};
+\end{tikzpicture}
+
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+No termin state , disc factor, no need for assmpt 1 and 2. Now $J_\pi (i) = \mathbb{E}_{(X_1,W_0|x_0=i)}[\sum_{k=0}^{N-1} \alpha^k g(x_k,\mu_k(x_k),w_k)]$.\\
+\textbf{Th} Opt cost to go sat BE with disc factor, unique , gives opt pol.\\
+\textbf{Aux SSP} equiv to disc: introduce $0$ and $\tilde{U}(0) = \text{stay}$. Dinmc $\tilde{x}_{k+1}=\tilde{w}_k$ with $\tilde{P}_{ij}(u)=\alpha P_{ij}(u) \forall i,j\in S^+$, $\tilde{P}_{i0}(u)=1-\alpha \forall i\in S^+$ and $\tilde{P}_{0j}(u)=0 \forall j \in S^+$ and $\tilde{P}_{00}(u) = 1$ and costs $\tilde{g}(\tilde{x}_k,\tilde{u}_k,\tilde{w}_k) = \alpha^{-1} g(\tilde{x}_k,\tilde{\mu}_k,\tilde{w}_k) $ and $\tilde{g}(\tilde{x}_k,\tilde{u}_k,0) = 0$.\\
+Disc problms conv to opt cost to go geometriclly with exp factor $\alpha$, smaller $\alpha \rightarrow$ faster conv of VI
+     \end{minipage}
+};
+%------------ Variation of Parameters Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {Discounted Problems};
+\end{tikzpicture}
+
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+    Ass $\forall i \in \mathcal{V} \;\forall Q \in \mathbb{Q}_{i,i} \; J(Q)\geq 0$ no neg cycls.\\
+    \textbf{DFSS} assume no dist and finite $S_k$.\\
+    \textbf{DFS to SP} $\mathcal{V}=U_k \{(k,x_k)|x_k \in S_k\} U \{T\}$, define $c(i,j) = g_N(x_N) $ if $i=(N,x_N),j=T$ and $c(i,j) = \text{min}_{u\dots} g_k(x_k,u) \;$if $i=(N,x_k) \, j=(k+1,x_{k+1})$ and $c(i,j) = +\infty$ otherwise\\
+    \textbf{SP to DFS} Introduces $c_{i,i} =0$ so optim path has $|\mathcal{V}|$. Let $N=|\mathcal{V}|-1$ , $S_k = \mathcal{V} \backslash \{T\}  \, k=1,\dots,N-1$ and $S_N =\{T\}$ and $S_0 = \{s\}$. Then $U_k = \mathcal{V}\backslash \{T\} \, k=0,\dots,N-2$ and $U_{N-1}=\{T\}$. Let $x_{k+1}=u_k$ , $g(x_k,u_k) = c_{x_k,u_k} \, k=0,\dots,N-1$ and $g_N(T)=0$. Solve DFS via DPA.\\
+    \textbf{Hidden MM} Let $M_{ij}(z) =p_{z|x,w}(z|i,j) z\in \mathcal{Z} $ meaus. space. Given measurmts $Z_1 = (z_1,\dots,z_N)$ find $\hat{X}_0 = \text{argmax}_{X_0} p(X_0|Z_1)=\text{argmax}_{X_0}p(X_0,Z_1)$. Find $p(X_0,Z_1) = p(x_0)\prod_{k=1}^N P_{x_{k-1}x_k}M_{x_{k-1}x_k}(z_k)$
+    Maximize equiv to $\text{minimize}_{X_0}(c_{S,(0,x_0)} + \sum_{k=1} c_{(k-1,x_{k-1}),(k,x_k)})$. Where
+    $c_{S,(0,x_0)}=-\ln(p(x_0))$ and $c_{(k-1,x_{k-1}),(k,x_k)} = -\ln (P_{x_{k-1}x_k} M_{x_{k-1}x_{k}}(z_k))$ if prod $>0$
+     \end{minipage}
+};
+%------------ Variation of Parameters Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {SSP and Det finite state systms};
+\end{tikzpicture}
+
+
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+\textbf{LCA} \textbf{0}- $s$ in OPEN , $d_s=0 , d_j)\infty$ \textbf{1} rmv $i$ from OPEN, exct 2 for all childrens $j$ of $i$ \textbf{2} if $d_i+c_{i,j}<d_j $ and $d_i+c_{i,j}<d_T$ set $d_j=d_i+c_{i,j}$. If $j\not=T$ put $j$ in OPEN \textbf{3} if OPEN empty end, else go to 1.\\
+\textbf{Th} if path $\exists$ then LCA termites $d_T=J_{Q^\star}$,othwise $d_T=\infty$.\\
+\textbf{Depth first} LIFO. \textbf{Breadth} FIFO. \textbf{Best First} remove $i^\star$ s.t. $d_{i^\star}=\text{min}_{i\in OPEN} d_i$. \textbf{A*} to enter OPEN need $d_i+c_{i,j}+h_j < d_T$
+     \end{minipage}
+};
+%------------ Variation of Parameters Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {SSP Algos};
+\end{tikzpicture}
+
+
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+    $\frac{d(F\circ G)(t)}{dt}=\frac{dF(G(t))}{dt}=\frac{dF(x)}{dt}|_{x=G(t)}\,\frac{dG(t)}{dt}$.\\
+    $F(x,y)\rightarrow\Delta F\approx \frac{\partial F(x,y)}{\partial x}\Delta x+\frac{\partial F(x,y)}{\partial y}\Delta y$\\
+    $F(x(t),y(t))\rightarrow\Delta F\approx \frac{\partial F(x,y)}{\partial x}\frac{d x(t)}{dt}\Delta t+\frac{\partial F(x,y)}{\partial y}\frac{d y(t)}{dt}\Delta t$\\
+    If vector field $\Delta F = [\Delta F_1 \dots\Delta F_p]^T \approx J_F [\Delta x_1\dots \Delta x_n]$ where in $J\in \mathbb{R}^{p\times n}$\\
+    $\dfrac{\partial F(G(x,u),y)}{\partial x}=\dfrac{\partial F(z,y)}{\partial z}|_{z=G(x,u)} \frac{\partial G(x,u)}{\partial x}$\\
+    $\dfrac{\partial F(t,x,\mu(x,t))}{\partial t}=\dfrac{\partial F(t,x,u)}{\partial t}|_{u=\mu(x,t)} + \frac{\partial F (t,x,u)}{\partial u}|_{u=\mu(t,x)}\dfrac{\partial \mu(t,x)}{\partial t}$\\
+    $\dfrac{dV(t,x(t))}{dt}=\dfrac{\partial V(t,x)}{\partial t}|_{x=x(t)}\dfrac{dt}{dt} + \dfrac{\partial V(t,x)}{\partial x}|_{x=x(t)}\dfrac{dx(t)}{dt}$\\
+    $\Delta V = V(t+\Delta t , x(t+\Delta t) - V(t,x(t))=\dfrac{d V(t,x(t))}{dt}\Delta t+o(\Delta t)$\\
+    \textbf{Dynamics} $\dot{x}(t)=f(x(t),u(t))$\\
+    \textbf{Cost} $h(x(T))+\int_0^T g(x(\tau),u(\tau))d\tau$, cost of feedback law is
+    $J_\mu (t,x) = h(x(T))+\int_t^Tg(x(\tau),u(\tau
+    ))d\tau$\\
+    \textbf{Ass} $\forall$ admis , init $t$ and in cond $\mu$ $\exists ! x(\tau)$ that sat dynamics  \\
+    \textbf{HJB} $0=\min_u [g(x,u)+\dfrac{\partial J^\star(t,x)}{\partial t}+\dfrac{\partial J^\star (t,x)}{\partial x}f(x,u)] \; \forall t \in [0,T] \; \forall x \in S$ subj to $J^\star (T,x) = h(x)$ suff condt for opt
+     \end{minipage}
+};
+%------------ Variation of Parameters Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {Deterministic Cont Time control . HJB Eq};
+\end{tikzpicture}
+
+
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+If $F(t,x,u)$ cont diff, assume $\exists\mu^\star(t,x) \in \text{argmin}_u F(t,x,u)$ then $\forall t,x$ $\dfrac{\partial(\min_u F(t,x,u))}{\partial t}=\frac{\partial F(t,x,u)}{\partial t}|_{u=\mu^\star}$
+and $\frac{\partial (\min_u (F(t,x,u)))}{\partial x}=\frac{\partial F(t,x,u)}{\partial x}|_{u=\mu^\star}$
+\textbf{Min Princ} Given $x(0) = x \in S$, let $u(t)$ opt contr traj assoc with $x(t)$. Then $\exists p(t)$ s.t.
+$\dot{p}(t) = -\frac{\partial H(x,u,p)}{\partial x}|^T_{x(t),u(t),p(t)}$ and $p(T)=\frac{\partial h(x)}{\partial x}|^T_{x(T)}$ and $u(t)\in \text{argmin}_u H(x(t),u,p(t))$ and $H(x(t),u(t),p(t)) = const \; \forall t\in [0,T]$ where $H(x,u,p) = g(x,u) + p^T f(x,u)$.\\
+If $u(t)$ sat those condts can be optimal. \\
+MP is necess cond for optim, while HKB is suff (if sat HJB $\rightarrow$ optim) , (if cand sol is diff, it must sat HJB)\\
+\textbf{Fixed Terminal State} Supp $x(0)=x_0$ and $x(T)=x_T$, then $h(x(T))$ not useful, thus $J(T,x)$ not diff  and \textbf{not} hold $p(T)=\frac{\partial h(x)}{\partial x}|_{x(T)}^T$. But we have$2n$ ODEs and $2n$ BCs. If $x_i(T)=x_{T,i}$ only for some i's. Then for the other coord u put $p_j(T)=\frac{\partial h(x)}{\partial x_j}|_{x(T)} $
+     \end{minipage}
+};
+%------------ Variation of Parameters Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {Pontryagin's Min Princ};
+\end{tikzpicture}
+
+
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+$x(0)$ free but extra $l(x(0))$ so tot cost is $l(x(0))+J(0,x(0))$. Nec cond is $(\frac{\partial l(x)}{\partial x}+\frac{\partial J(0,x)}{\partial x})|_{x_0}=0$ so we can get the adjoint BC $p(0)=-\frac{\partial l(x)}{\partial x}|^T_{x(0)}$\\
+\textbf{Free Terminal State} Compute opt traj for various $T$ and look for best $T$. So optimal $T$ must sat $\frac{\partial J(t,x)}{\partial t}|_{t=0,x(0)}=0$, we get that $H(x(t),u(t),p(t))=0\forall t\in [0,T]$\\
+\textbf{Time Varying System and Cost}\\
+System and stage cost vary with time
+     \end{minipage}
+};
+%------------ Variation of Parameters Header ---------------------
+\node[fancytitle, right=10pt] at (box.north west) {Free Initial State};
+\end{tikzpicture}
+
+%------------ 1st order ODEs ---------------
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}
+    \textbf{Separable} \;\; $y' = a(x)\,b(y)$ \\
+    $\displaystyle \frac{dy}{b(y)} = a(x)\,dx
+    \;\Rightarrow\;
+    \int \frac{1}{b(y)}\,dy = \int a(x)\,dx + C$ \\[2pt]
+
+    \textbf{Autonoma} \;\; $y' = f(y)$ \\
+    $\displaystyle \int \frac{1}{f(y)}\,dy = x + C$ \\[4pt]
+
+    \textbf{Lineare} \;\; $y' + p(x)y = q(x)$ \\
+    Fattore integrante: $\displaystyle \mu(x)=e^{\int p(x)\,dx}$ \\
+    $\displaystyle (\mu y)' = \mu q
+    \;\Rightarrow\;
+    y(x)=\mu(x)^{-1}\Big(\int \mu(x)\,q(x)\,dx + C\Big)$ \\[4pt]
+
+    \textbf{Omogenea (in $y/x$)} \;\; $y' = F\!\left(\frac{y}{x}\right)$ \\
+    Sost: $y=vx$ \; $\Rightarrow$ \; $y' = v + x v'$ \\
+    $\displaystyle v + x v' = F(v)
+    \;\Rightarrow\;
+    \frac{dv}{F(v)-v} = \frac{dx}{x}$ \\[4pt]
+
+    \textbf{Bernoulli} \;\; $y' + p(x)y = q(x)\,y^n,\;\; n\neq 0,1$ \\
+    Sost: $z = y^{1-n}$ \;\; $\Rightarrow$ \;\;
+    $\displaystyle z' + (1-n)p(x)z = (1-n)q(x)$ \\
+    (poi risolvi come lineare in $z$) \\[4pt]
+
+    \textbf{Esatta} \;\; $M(x,y)\,dx + N(x,y)\,dy = 0$ \\
+    Cond: $\partial_y M = \partial_x N$ \;\; $\Rightarrow\;\; \exists \Phi: d\Phi = Mdx+Ndy$ \\
+    Sol: $\Phi(x,y)=C$ \\
+    \textbf{Integrating factor} (se non esatta): \\
+    se $\displaystyle \frac{\partial_y M-\partial_x N}{N}=f(x)$ allora $\mu(x)=e^{\int f(x)dx}$ \\
+    se $\displaystyle \frac{\partial_x N-\partial_y M}{M}=g(y)$ allora $\mu(y)=e^{\int g(y)dy}$ \\[4pt]
+
+    \textbf{Riccati (cenno)} \;\; $y'=a(x)y^2+b(x)y+c(x)$ \\
+    Se conosci una sol. particolare $y_p$: sost $y=y_p+\frac{1}{v}$ \\
+    $\Rightarrow$ EDO lineare in $v$.
+    \end{minipage}
+};
+\node[fancytitle, right=10pt] at (box.north west) {1st order ODEs};
+\end{tikzpicture}
+
+\end{multicols*}
+\end{document}
+
+
+Contact GitHub API Training Shop Blog About
+© 2016 GitHub, Inc. Terms Privacy Security Status Help
