@@ -1,0 +1,94 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,amsfonts,amsthm,mathtools}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\usepackage{hyperref}
+\usepackage{framed}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    urlcolor=blue!60!black,
+    citecolor=blue!60!black,
+    pdftitle={Computational Control -- Lecture Handout},
+    pdfauthor={Riccardo Polo},
+    pdfsubject={Dynamic Programming, LQR, MPC, Identification, Data-Driven Predictive Control, MDPs, Monte Carlo Learning, Reinforcement Learning}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Computational Control}
+\fancyhead[R]{Lecture Handout}
+\fancyfoot[C]{\thepage\ / \pageref{LastPage}}
+
+\titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{0.6em}{}
+
+\setlist[itemize]{topsep=2pt,itemsep=2pt}
+\setlist[enumerate]{topsep=2pt,itemsep=2pt}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\cS}{\mathcal{S}}
+\newcommand{\cA}{\mathcal{A}}
+\newcommand{\cU}{\mathcal{U}}
+\newcommand{\cX}{\mathcal{X}}
+\newcommand{\argmin}{\operatorname*{arg\,min}}
+\newcommand{\tr}{\operatorname{tr}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\stagecost}{\ell}
+\newcommand{\terminalcost}{V_f}
+
+\newtheorem*{remark}{Remark}
+\newtheorem*{idea}{Key idea}
+
+% Colored theorem/statement box
+\newtcolorbox{theorembox}[1][]{
+    enhanced,
+    breakable,
+    colback=blue!5,
+    colframe=blue!60!black,
+    boxrule=0.7pt,
+    arc=3pt,
+    left=6pt,
+    right=6pt,
+    top=6pt,
+    bottom=6pt,
+    fonttitle=\bfseries,
+    title=#1
+}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    {\scshape\LARGE Computational Control\par}
+    \vspace{0.6cm}
+    {\huge\bfseries Lecture Handout\par}
+    \vspace{0.8cm}
+    \vfill
+    {\large \today\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Dynamic Programming and LQR}
+\input{chapters/01_DP_LQR}
+\end{document}
