@@ -1,0 +1,39 @@
+\begin{tikzpicture}[>=Stealth, line cap=round, line join=round, scale=1.0]
+    % Axes
+    \draw[->, thick] (-2.3,0) -- (8.2,0) node[below right] {$t$};
+    \draw[->, thick] (0,-0.6) -- (0,2.6) node[left] {$u$};
+
+    % Horizon marker T
+    \draw[thick] (3.2,-0.2) -- (3.2,0.2);
+    \node at (1.5,0.35) {\Large $T$};
+
+    % Labels past / future
+    \node at (-1.2,-0.45) {\large past};
+    \node at (1.2,-0.45) {\large future};
+
+    % Applied inputs (past - red filled)
+    \foreach \x/\y in {
+        -2.0/0.55,
+        -1.6/0.55,
+        -1.2/0.80,
+        -0.8/0.55,
+        -0.4/1.05
+    }{
+        \fill[red] (\x,\y) circle (0.08);
+    }
+
+    % Current input at time 0 (highlighted)
+    \fill[green!70!black] (0,1.10) circle (0.08);
+
+    % Planned inputs (future - red open)
+    \foreach \x/\y in {
+        0.8/1.55,
+        1.2/2.20,
+        1.6/1.55,
+        2.2/2.20,
+        2.6/1.00
+    }{
+        \draw[red] (\x,\y) circle (0.08);
+    }
+
+\end{tikzpicture}

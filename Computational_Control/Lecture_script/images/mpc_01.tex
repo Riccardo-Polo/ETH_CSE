@@ -1,0 +1,71 @@
+\begin{tikzpicture}[>=Stealth, line cap=round, line join=round, scale=1.0]
+
+    % Axes
+    \draw[->, thick] (0,0) -- (11.5,0) node[below right] {$t$};
+    \draw[->, thick] (0,0) -- (0,3.2) node[left] {$u$};
+
+    % Horizon marker
+    \draw[dashed, thick] (1.6,-0.05) -- (1.6,2.7);
+
+    % T mark
+    \draw[thick] (10.0,-0.15) -- (10.0,0.25);
+    \node[below] at (10.05,-0.1) {$T$};
+
+    % Legend
+    \node[draw=gray, circle, minimum size=5pt, inner sep=0pt] at (6.0,2.55) {};
+    \node[anchor=west] at (6.4,2.55) {previously planned input};
+
+    \node[draw=red, circle, minimum size=5pt, inner sep=0pt] at (6.0,2.05) {};
+    \node[anchor=west] at (6.4,2.05) {planned input};
+
+    \node[fill=red, draw=red, circle, minimum size=5pt, inner sep=0pt] at (6.0,1.55) {};
+    \node[anchor=west] at (6.4,1.55) {applied input};
+
+    % Previously planned input (gray open circles)
+    \foreach \x/\y in {
+        1.6/2.55,
+        2.05/1.25,
+        2.45/0.45,
+        3.15/0.00,
+        3.55/0.00,
+        3.95/0.00,
+        4.35/0.00
+    }{
+        \draw[gray] (\x,\y) circle (0.07);
+    }
+
+    % Planned input (red open circles)
+    \foreach \x/\y in {
+        1.6/2.20,
+        2.1/1.95,
+        2.9/1.60,
+        3.4/0.60,
+        3.9/0.95,
+        4.35/0.95,
+        4.85/0.30,
+        5.3/0.05,
+        5.75/0.03,
+        6.2/0.03,
+        6.65/0.03,
+        7.1/0.03,
+        7.55/0.03,
+        8.0/0.03,
+        8.45/0.03,
+        8.9/0.03,
+        9.35/0.03,
+        10.0/0.03
+    }{
+        \draw[red] (\x,\y) circle (0.07);
+    }
+
+    % Applied input (red filled circles)
+    \foreach \x/\y in {
+        0.0/1.35,
+        0.5/1.95,
+        1.0/2.50,
+        1.35/1.95
+    }{
+        \fill[red] (\x,\y) circle (0.07);
+    }
+
+\end{tikzpicture}

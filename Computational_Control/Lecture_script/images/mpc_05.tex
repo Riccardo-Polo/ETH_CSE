@@ -1,0 +1,21 @@
+\begin{tikzpicture}[
+    >=Stealth,
+    block/.style={draw, thick, minimum width=3cm, minimum height=1.8cm},
+    node distance=4cm
+]
+
+\node[block] (controller) {$u^*(\cdot)$};
+\node[block, right=of controller] (plant) {plant};
+
+\draw[->, thick] (controller.east) -- node[above] {$u_t$} (plant.west);
+\draw[->, thick] (plant.east) -- ++(1.5,0) node[above] {$x_t$};
+
+\coordinate (out) at ($(plant.east)+(1.5,0)$);
+\coordinate (low) at ($(out)+(0,-2)$);
+\coordinate (leftlow) at ([xshift=-1.2cm]controller.west |- low);
+\coordinate (leftmid) at ([xshift=-1.2cm]controller.west);
+
+\draw[->, thick]
+    (out) -- (low) -- (leftlow) -- (leftmid) -- (controller.west);
+
+\end{tikzpicture}

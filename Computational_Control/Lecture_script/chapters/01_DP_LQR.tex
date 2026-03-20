@@ -1,3 +1,4 @@
+\subsection{Introduction}
 In general we formulate the optimization control task as
 \begin{equation}
     \min_{\mathbf{u} \in \mathcal{U}} J(\mathbf{u})
@@ -199,9 +200,9 @@ A^\top P_{t+1} B
 B^\top P_{t+1} A}
 \Big)
 x \\[6pt]
-&= x^\top \textcolor{blue}{P_t} x \qed
+&= x^\top \textcolor{blue}{P_t} x
 \end{align*}
-To complete the proof one should check that $P_t$ is positive semidefinite. Here we homit the proof.\\
+To complete the proof one should check that $P_t$ is positive semidefinite. Here we homit the proof. $\quad  \blacksquare$\\
 In cocnlusion we have been able to derive a closed-form expression for the optimal control input $u^*$ for the LQR problem.Be aware that this solution is not valid anymore if the problem becomes constrained.\\
  
 We summerize here the main results:

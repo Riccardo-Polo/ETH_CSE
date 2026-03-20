@@ -1,0 +1,71 @@
+\begin{tikzpicture}[>=Stealth, line cap=round, line join=round, scale=1.0]
+    % Axes
+    \draw[->, thick] (0,-0.6) -- (0,2.5) node[left] {$x$};
+    \draw[->, thick] (-0.5,0) -- (11.3,0) node[below right] {$t$};
+
+    % "now" dashed line
+    \draw[dashed, thick] (1.8,-0.05) -- (1.8,2.4);
+    \node[below] at (1.8,-0.12) {\large now};
+
+    % Horizon marker T
+    \draw[thick] (9.0,-0.18) -- (9.0,0.18);
+    \node[below] at (9.35,-0.08) {\Large $T$};
+
+    % Legend
+    \draw[gray] (5.6,1.95) circle (0.07);
+    \node[anchor=west] at (6.0,1.95) {previously predicted state};
+
+    \draw[blue!80!black] (5.6,1.45) circle (0.07);
+    \node[anchor=west] at (6.0,1.45) {predicted state};
+
+    \fill[blue!80!black] (5.6,0.95) circle (0.07);
+    \node[anchor=west] at (6.0,0.95) {measured state};
+
+    % Previously predicted state (gray open circles)
+    \foreach \x/\y in {
+        0.90/1.5,
+        1.35/1,
+        1.80/0.55,
+        2.25/0.28,
+        2.70/0.55,
+        3.15/0.00,
+        3.60/0.00,
+        4.05/0.00
+    }{
+        \draw[gray] (\x,\y) circle (0.07);
+    }
+
+    % Predicted state (blue open circles)
+    \foreach \x/\y in {
+        2.25/1.05,
+        2.70/1.05,
+        3.15/0.80,
+        3.60/0.52,
+        4.05/0.25,
+        4.50/0.02,
+        4.95/0.02,
+        5.40/0.02,
+        5.85/0.02,
+        6.30/0.02,
+        6.75/0.02,
+        7.20/0.02,
+        7.65/0.02,
+        8.10/0.02,
+        8.55/0.02,
+        9.00/0.02
+    }{
+        \draw[blue!80!black] (\x,\y) circle (0.07);
+    }
+
+    % Measured state (blue filled circles)
+    \foreach \x/\y in {
+        0.00/1.95,
+        0.45/1.95,
+        0.90/1.70,
+        1.35/1.42,
+        1.80/1.15
+    }{
+        \fill[blue!80!black] (\x,\y) circle (0.07);
+    }
+
+\end{tikzpicture}

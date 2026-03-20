@@ -1,0 +1,163 @@
+\subsection{Introduction}
+In the previous chapter we have seen an overview of the LQR problem and how to solve it using dynamic programming. In that formulation, we assumed that there were no constraints on the state and control input. However, in many real-world applications, constraints on the state and input must be explicitly taken into account.\\
+In the presence of constraints, the problem cannot, in general, be solved in closed form via backward induction as in the unconstrained LQR case, since the value function is no longer quadratic.The resulting optimization problem becomes:
+
+\begin{theorembox}[Constrained LQ finite horizon problem]
+\begin{align*}
+\min_{u_0, \ldots, u_{T-1},x_0,\dots,x_T} &\sum_{t=0}^{T-1} \left( x_t^\top Q x_t + u_t^\top R u_t \right) + x_T^\top S x_T \\
+\text{s.t.} \quad & x_{t+1} = A x_t + B u_t, \quad t=0, \ldots, T-1 \\
+& x_0 = x_0 \\
+& \textcolor{red}{x_t \in \mathcal{X}_t}\\
+& \textcolor{red}{u_t \in \mathcal{U}_t}
+\end{align*}
+Usually, the constraint sets are convex, e.g., polytopes.
+\end{theorembox}
+
+One could solve this optimization problem in a \textbf{one-shot} fashion (i.e., open-loop strategy), obtaining an optimal input sequence $u_0, \ldots, u_{T-1}$ for the given initial state $x_0$, instead of a state-feedback policy as in the unconstrained case (where $u_t = \Gamma_t x_t$).\\ However, if disturbances or model mismatch cause the system to deviate from the predicted trajectory, the previously computed control sequence is no longer optimal. As a result, the system will follow a different trajectory than expected (see Figures \ref{fig:mpc_01} and \ref{fig:mpc_02}).\\
+To address this issue, the optimal control problem must be re-solved using the updated state information. Since we assume a Markovian system, the current state contains all the information needed to compute an optimal control sequence for the future. This implies that the optimization problem must be solved repeatedly, at each time step, within one sampling interval.
+
+\begin{figure}[!ht]
+\centering
+\input{images/mpc_01.tex}
+\caption{Receding-horizon update of the input sequence: previously planned inputs are shifted, a new optimal input sequence is computed based on the current state.}
+\label{fig:mpc_01}
+\end{figure}
+
+\begin{figure}[!ht]
+\centering
+\input{images/mpc_02.tex}
+\caption{Receding-horizon update of the state trajectory: previously predicted states are corrected using the measured state at the current time, and a new optimal state trajectory is predicted over the horizon.}
+\label{fig:mpc_02}
+\end{figure}
+
+The idea that emerges from this discussion is to solve the optimization problem in a \textbf{receding horizon} fashion. At each time step, we solve a finite-horizon optimal control problem of length $T$, and apply only the first control input of the optimal sequence (see Figure \ref{fig:mpc_03}).\\
+At the next time step, the new state is measured, and the optimization problem is solved again with the updated initial condition. If the system is time-invariant, the optimization problem remains the same at each time step, except for the initial state. The corresponding predicted state evolution over the horizon is illustrated in Figure \ref{fig:mpc_04}.\\
+
+\begin{figure}[!ht]
+\centering
+\input{images/mpc_03.tex}
+\caption{Finite-horizon input sequence in receding horizon control: at the current time, an optimal sequence of future inputs over a horizon of length $T$ is computed, while past inputs are fixed.}
+\label{fig:mpc_03}
+\end{figure}
+
+\begin{figure}[!ht]
+\centering
+\input{images/mpc_04.tex}
+\caption{Finite-horizon state prediction in receding horizon control: starting from the current state, future states are predicted over a horizon of length $T$ using the planned input sequence.}
+\label{fig:mpc_04}
+\end{figure}
+
+Thus the following scheme defines the receding horizon control strategy, also known as \textbf{Model Predictive Control (MPC)}:
+\begin{enumerate}
+\item At time $t$, measure the current state $x_t$.
+\item Solve the finite-horizon optimal control problem with initial state $x_t$ to obtain the optimal input sequence $u_t, u_{t+1}, \ldots, u_{t+T-1}$.
+\item Apply the first control input $u_t$ to the system.
+\item Increment time $t \leftarrow t+1$ and repeat from step 1.
+\end{enumerate}
+
+The resulting \textbf{open-loop optimal control problem} corresponds to a \textit{parametric
+optimization problem} parametrized in the \textcolor{red}{initial state x}.
+\begin{theorembox}[Parametric optimization problem ]
+$u^*(x)$ is determined by\footnote{Notation: $k$ is the index for the optimization problem, while $t$ is the index for the time steps of the system.}
+\begin{align*}
+    \min_{\mathbf{u},\mathbf{x}} &\sum_{k=0}^{T-1} \left( x_k^\top Q x_k + u_k^\top R u_k \right) + x_T^\top S x_T\\
+    \text{s.t.} \quad & x_{k+1} = A x_k + B u_k\\
+    & \textcolor{red}{x_0 = x} \\
+    & x_k \in \mathcal{X}_k \\
+    & u_k \in \mathcal{U}_k
+\end{align*}
+\end{theorembox}
+
+The parametric nature of the problem immediately raises the question of whether the resulting control strategy is \emph{feedforward} or \emph{feedback}. Although the optimization problem computes an open-loop input sequence, the receding horizon implementation introduces feedback implicitly. Indeed, at each time step the optimization problem is solved using the current state $x_t$, and only the first input of the optimal sequence is applied. Therefore, the implemented control law can be written as
+\[
+u_t = u^*(x_t),
+\]
+which defines a \textbf{state-feedback control law}. One can have a visual intuition of this feedback structure by looking at the block diagram in Figure \ref{fig:mpc_05}.
+\begin{figure}[!ht]
+\centering
+\input{images/mpc_05.tex}
+\caption{Block diagram of the MPC control scheme}
+\label{fig:mpc_05}
+\end{figure}
+
+We can establish some properties about this optimization problem:
+\begin{itemize}
+    \item Under \textbf{continuity} assumptions on the cost and the dynamics, the minimum cost is a constinuous function of the initial state $x$.
+    \item Under \textbf{compactness} assumptions on the constraints, the parametric optimization problem admits a solution for all $x$ in the feasible set.
+    \item The map $x \mapsto u^*(x)$ is not necessarily continuos for a general cost function
+\end{itemize}
+In the case of linear dynamics, quadratic cost, and convex constraints, the optimization problem is a convex quadratic program (QP) parametrized in the initial state $x$. In this case, the map $x \mapsto u^*(x)$ is piecewise affine and continuous. However, in general, the control law induced by MPC can be nonlinear and non-smooth.
+\begin{theorembox}[MPC control law]
+As a consequence, MPC can be interpreted as a \textbf{memory-less, nonlinear, time-invariant feedback control law}. The nonlinearity arises from the presence of constraints, even when the system dynamics are linear and the cost is quadratic.\\
+\end{theorembox}
+
+A natural question is whether MPC can achieve \emph{perfect tracking}, i.e., zero steady-state error. In general, this is not guaranteed without additional design choices (e.g., terminal ingredients or disturbance modeling), since the controller repeatedly solves a finite-horizon problem and does not explicitly enforce asymptotic properties beyond the prediction horizon.
+To better understand the relation between MPC and the finite-horizon optimal control problem, consider the following example:
+\paragraph{Example}
+\begin{align*}
+\min_{\mathbf{x},\mathbf{u}} \quad & \sum_{t=0}^{T-1} a^t |u_t| + |x_T|^2, \quad |a| < 1 \\
+\text{s.t.} \quad & x_{t+1} = x_t + u_t.
+\end{align*}
+
+Two different questions can be asked:
+\begin{enumerate}
+    \item What is the optimal open-loop solution $(\mathbf{x}^*, \mathbf{u}^*)$?
+    \item What is the MPC feedback law $x \mapsto u^*(x)$ obtained by solving the problem in a receding horizon fashion?
+\end{enumerate}
+To solve this we observe that the cost is not quadratic and that the cost of applying inouts is discounted over time. Furthermore the state is penalized only at the end of the horizon.\\
+Thus the optimal solution is to simply wait for the last time step and then apply $u_{T} = -x_{T}$, which yields a cost of $|x_0|^2$.\\
+In contrast, the MPC feedback law is given by the control law $x \mapsto u^*(x)=0$.\\
+A key observation is that the optimal trajectory associated with the finite-horizon problem is, in general, \textbf{never realized in closed loop}, even in the absence of disturbances or model mismatch. This is because at each time step the optimization problem is re-solved with a shifted horizon, leading to a different optimal sequence than the one computed previously.
+$\blacksquare$
+
+\medskip
+
+Consider now the unconstrained linear-quadratic problem:
+\begin{align*}
+\min_{\mathbf{x},\mathbf{u}} \quad & \sum_{t=0}^{T-1} \left( x_t^\top Q x_t + u_t^\top R u_t \right) + x_T^\top S x_T, \quad Q,S \succeq 0,\; R \succ 0 \\
+\text{s.t.} \quad & x_{t+1} = A x_t + B u_t.
+\end{align*}
+\textbf{Finite-time LQR} yields a time-varying linear feedback law
+\begin{align*}
+    u_t &= \Gamma_t x_t\\
+    \Gamma_t &= -(R + B^\top P_{t+1} B)^{-1} B^\top P_{t+1} A
+\end{align*}
+where the matrices $P_t$ are computed backward in time. The control gain explicitly depends on time through $P_{t+1}$.\\
+In contrast, \textbf{MPC} repeatedly solves the same finite-horizon problem at each time step. As a result, the applied control law is
+\[
+u_t = \Gamma_0 x_t,
+\]
+where $\Gamma_0$ is the gain associated with the first step of the horizon. Hence, MPC induces a \textbf{linear time-invariant} feedback law.\\
+More explicitly, at time $t=0$ both approaches yield the same control input:
+\[
+u_0^{\text{MPC}} = -(R + B^\top P_1 B)^{-1} B^\top P_1 A x_0 = u_0^{\text{LQR}}.
+\]
+However, at the next time step a discrepancy appears. Finite-time LQR applies
+\[
+u_1^{\text{LQR}} = \textcolor{blue}{-(R + B^\top P_2 B)^{-1} B^\top P_2 A} x_1,
+\]
+while MPC recomputes the problem and applies again
+\[
+u_1^{\text{MPC}} = {-(R + B^\top \textcolor{red}{P_1} B)^{-1} B^\top \textcolor{red}{P_1} A} x_1.
+\]
+Therefore, even in the unconstrained case, MPC does not reproduce the finite-horizon optimal control sequence beyond the first step.
+
+\subsection{Implementation of MPC}
+The implementation of MPC requires solving an optimization problem at each time step. We show two main approaches to implement MPC:
+\begin{enumerate}
+    \item Compute the \textbf{function} $u^*(\cdot)$ \textbf{offline}, and then evaluate it online at each time step.
+    \begin{itemize}
+        \item It is extremely complex to solve with exception of very few cases
+        \item Abundant offline computational resources are required 
+        \item Large memory is required to store the function $u^*(\cdot)$
+    \end{itemize}
+    \item Compute the \textbf{value} of the function $U^*(\cdot)$ \textbf{online} at each time step by solving the optimization problem.
+    \begin{itemize}
+        \item It is ogten a tractable optimization problem.
+        \item It has limited time to perform computation online.
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Explicit MPC}
+Explicit MPC corresponds to the first approach listed above.\\
+In the previous pages we have already observed one case. It is the case of \textbf{Uncontrained linear MPC} were 
