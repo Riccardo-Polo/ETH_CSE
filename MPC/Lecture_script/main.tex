@@ -18,7 +18,6 @@
 \usepackage{titlesec}
 \usepackage{fancyhdr}
 \usepackage{lastpage}
-\usepackage{tikz}
 \usetikzlibrary{arrows.meta, positioning, calc}
 
 \hypersetup{
@@ -33,7 +32,7 @@
 
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{Computational Control}
+\fancyhead[L]{Model Predictive Control}
 \fancyhead[R]{Lecture Handout}
 \fancyfoot[C]{\thepage\ / \pageref{LastPage}}
 
@@ -80,7 +79,7 @@
 
 \begin{titlepage}
     \centering
-    {\scshape\LARGE Computational Control\par}
+    {\scshape\LARGE Model Predictive Control\par}
     \vspace{0.6cm}
     {\huge\bfseries Lecture Handout\par}
     \vspace{0.8cm}
@@ -91,8 +90,8 @@
 \tableofcontents
 \newpage
 
-\section{Dynamic Programming and LQR}
-\input{chapters/01_DP_LQR}
+\section{Systems theory basics}
+\input{chapters/01_ST_basics}
 
 \newpage
 \section{Model Predictive Control}

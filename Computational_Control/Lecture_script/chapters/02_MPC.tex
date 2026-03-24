@@ -159,5 +159,245 @@ The implementation of MPC requires solving an optimization problem at each time 
 \end{enumerate}
 
 \subsubsection{Explicit MPC}
-Explicit MPC corresponds to the first approach listed above.\\
-In the previous pages we have already observed one case. It is the case of \textbf{Uncontrained linear MPC} were 
+
+Explicit MPC corresponds to the first implementation strategy: instead of solving the optimization problem online at each sampling instant, we try to compute the feedback law$ x \mapsto u^*(x) $
+offline.\\
+We have already seen one important case. In the \textbf{unconstrained linear MPC} case, the optimizer is simply the first element of the finite-horizon LQR solution. Therefore, the applied input can be written as
+\[
+u_t = u^*(x_t)=\Gamma_0 x_t,
+\]
+so the control law is linear.\\
+
+The natural question is what happens when \emph{constraints} are introduced. Consider the standard constrained linear MPC problem
+
+\begin{theorembox}[Linear MPC with linear constraints]
+\begin{align*}
+\min_{\mathbf{u},\mathbf{x}} \quad &
+\sum_{k=0}^{T-1}\left(x_k^\top Q x_k + u_k^\top R u_k\right) + x_T^\top S x_T \\
+\text{s.t.}\quad
+& x_{k+1}=Ax_k+Bu_k, \qquad k=0,\dots,T-1, \\
+& x_0=x, \\
+& x_k \in \mathcal{X}, \qquad \mathcal{X}=\{x \in \mathbb{R}^n : Cx \le d\}, \\
+& u_k \in \mathcal{U}, \qquad \mathcal{U}=\{u \in \mathbb{R}^m : Eu \le f\},
+\end{align*}
+with $ Q,S \succeq 0, \qquad R \succ 0 $.\\
+This is the most common MPC formulation: linear dynamics, quadratic cost, and polyhedral state/input constraints.
+\end{theorembox}
+This problem is a \textbf{convex quadratic program} parametrized by the initial state $x$. In general, the optimizer is no longer globally linear. However, due to the quadratic cost and linear constraints, it still has a very specific structure: the explicit MPC law turns out to be \textbf{piecewise affine}. The idea is best understood through a very simple example.
+
+\paragraph{Example}
+Consider a scalar integrator with horizon $T=1$:
+\begin{align*}
+\min_{u_0,x_1} \quad & u_0^2 + x_1^2 \\
+\text{s.t.}\quad & x_1 = x_0 + u_0, \\
+& x_1 \le 1.
+\end{align*}
+
+This example is useful because:
+\begin{itemize}
+    \item it is a quadratic problem with a linear constraint,
+    \item it is parametrized by the current state $x_0$,
+    \item the equality constraint allows us to eliminate the variable $x_1$,
+    \item the problem is convex, hence the KKT conditions are necessary and sufficient.
+\end{itemize}
+Using the model equation $x_1=x_0+u_0$, we can eliminate $x_1$ and rewrite the problem as
+\[
+\min_{u_0} f(u_0)
+\qquad \text{s.t.} \qquad g(u_0)\le 0,
+\]
+where
+\begin{align*}
+f(u_0) &= u_0^2 + (x_0+u_0)^2, \\
+g(u_0) &= x_0 + u_0 - 1.
+\end{align*}
+The derivatives are
+\begin{align*}
+\nabla f(u_0) &= 4u_0 + 2x_0, \\
+\nabla g(u_0) &= 1.
+\end{align*}
+
+\begin{theorembox}[KKT conditions for one inequality constraint]
+For a problem of the form
+\[
+\min_x f(x)
+\qquad \text{s.t.}\qquad g(x)\le 0,
+\]
+the KKT conditions are
+\begin{align*}
+\nabla f(x)+\mu \nabla g(x) &= 0, \qquad \mu \ge 0,\\
+g(x) &\le 0,\\
+\mu\, g(x) &= 0.
+\end{align*}
+The last relation is the \emph{complementary slackness} condition.
+\end{theorembox}
+
+Applying the KKT conditions to the problem gives
+\begin{align*}
+4u_0 + 2x_0 + \mu &= 0, \qquad \mu \ge 0, \\
+x_0 + u_0 - 1 &\le 0, \\
+\mu(x_0 + u_0 - 1) &= 0.
+\end{align*}
+
+The complementary slackness condition implies that two cases are possible.
+
+\paragraph{Case 1: inactive constraint.}
+Assume first that the inequality is inactive, so
+\[
+\mu = 0.
+\]
+Then stationarity becomes
+\[
+4u_0 + 2x_0 = 0,
+\]
+hence
+\[
+u_0 = -\frac{x_0}{2}.
+\]
+To check whether this candidate is feasible, we substitute it into the constraint:
+\[
+x_0 + u_0 - 1 = x_0 - \frac{x_0}{2} - 1 = \frac{x_0}{2} - 1.
+\]
+Therefore feasibility requires
+\[
+\frac{x_0}{2} - 1 \le 0
+\qquad \Longleftrightarrow \qquad
+x_0 \le 2.
+\]
+So, for all initial states satisfying $x_0 \le 2$, the optimal input is
+\[
+u_0^* = -\frac{x_0}{2}.
+\]
+
+\paragraph{Case 2: active constraint.}
+Assume now that the inequality is active, so
+\[
+x_0 + u_0 - 1 = 0.
+\]
+Then
+\[
+u_0 = 1 - x_0.
+\]
+Substituting this into the stationarity condition,
+\[
+4u_0 + 2x_0 + \mu = 0,
+\]
+we obtain
+\[
+\mu = -4u_0 - 2x_0 = -4(1-x_0)-2x_0 = 2x_0 - 4.
+\]
+Since $\mu \ge 0$, this case is valid only if
+\[
+2x_0 - 4 \ge 0
+\qquad \Longleftrightarrow \qquad
+x_0 \ge 2.
+\]
+Hence, for all $x_0 \ge 2$, the optimal input is
+\[
+u_0^* = 1 - x_0.
+\]
+
+Combining the two cases, the explicit solution is
+\begin{theorembox}[Explicit solution of the toy MPC problem]
+\[
+u_0^*(x_0)=
+\begin{cases}
+-\dfrac{x_0}{2}, & x_0 \le 2, \\[1ex]
+1-x_0, & x_0 \ge 2.
+\end{cases}
+\]
+\end{theorembox}
+
+This example shows the main structural property of explicit MPC:
+\begin{itemize}
+    \item the control law is \textbf{continuous},
+    \item the control law is \textbf{piecewise affine},
+    \item each affine expression is valid in a region where the same set of constraints is active.
+\end{itemize}
+
+The reason is the following. Once the active constraints are known, the KKT conditions reduce to a linear system in the decision variables and the multipliers. Solving that linear system gives an optimizer that depends \emph{affinely} on the parameter $x$. When the active set changes, a different affine expression is obtained. Therefore, the state space is partitioned into regions, and on each region the controller is affine.\\
+
+Although the explicit solution is conceptually appealing, it becomes difficult to use in large problems. In practice:
+\begin{itemize}
+    \item there may be tens or hundreds of constraints,
+    \item the number of regions may become very large,
+    \item the offline computation required to determine all regions can be very long,
+    \item even online, one must determine in which region the current state lies before evaluating the affine law.
+\end{itemize}
+As a consequence, explicit MPC is mainly attractive when the system dimension is small and the sampling time is so short that solving a quadratic program online would be too expensive. For larger systems, the most common approach is instead to solve the MPC optimization problem online at each sampling instant.
+
+\subsection{Stability}
+
+A useful way to think about MPC is as a \emph{feedback design tool}. Once the prediction horizon $T$ and the weights $Q,R,S$ are chosen, the receding-horizon implementation induces a control law of the form
+\[
+u_t = u^*(x_t).
+\]
+Even though the optimization problem computes an open-loop input sequence, only the first input is applied and the problem is solved again at the next time step. Therefore, the implemented controller is a \textbf{static, time-invariant, nonlinear feedback law}. The nonlinearity does not necessarily come from the dynamics; it already appears because of the repeated constrained optimization.\\
+From this perspective, the main question is no longer only how to solve the optimization problem, but whether the resulting closed-loop system is stable. There are two conceptually different ways to approach this question. The first is an \emph{analysis} point of view: one tries to compute the control law $u^*(\cdot)$ explicitly and then study the stability of the closed-loop dynamics. In general, this is difficult, because the MPC law can be piecewise affine or more generally nonlinear and non-smooth. The second is a \emph{design} point of view: instead of computing the feedback law explicitly, one looks for conditions on the design parameters $T,Q,R,S$ that guarantee closed-loop stability directly. This is the more useful viewpoint in practice.\\
+
+To study stability, the standard tool is Lyapunov analysis. Consider a discrete-time system
+\[
+x_{t+1}=f(x_t),
+\]
+and suppose that the origin $x=0$ is an equilibrium, that is, $f(0)=0$.
+
+\begin{theorembox}[Stable equilibrium]
+The equilibrium $x=0$ is said to be \textbf{stable} if
+\[
+\forall \varepsilon > 0, \ \exists \delta > 0 \text{ such that } \norm{x_0}<\delta
+\ \Longrightarrow\ 
+\norm{x_t}<\varepsilon \quad \forall t\geq 0.
+\]
+In words, if the initial condition is sufficiently close to the equilibrium, then the entire trajectory remains close to it for all future times.
+\end{theorembox}
+
+Stability alone only guarantees that trajectories do not move far away from the equilibrium. A stronger notion is asymptotic stability, which additionally requires convergence to the equilibrium.
+
+\begin{theorembox}[Asymptotically stable equilibrium]
+The equilibrium $x=0$ is \textbf{asymptotically stable} if it is stable and
+\[
+\lim_{t\to\infty}\norm{x_t}=0.
+\]
+Hence, trajectories starting sufficiently close to the origin remain close to it and eventually converge to it.
+\end{theorembox}
+
+The classical criterion to prove asymptotic stability is based on a Lyapunov function.
+
+\begin{theorembox}[Lyapunov theorem for discrete-time systems]
+Assume there exists a real-valued function $W:\mathbb{R}^n\to\mathbb{R}$ such that
+\begin{align*}
+W(0) &= 0,\\
+W(x) &> 0 \qquad \forall x\neq 0,\\
+W(f(x)) &< W(x) \qquad \forall x\neq 0.
+\end{align*}
+Then the equilibrium $x=0$ is asymptotically stable.
+\end{theorembox}
+
+The idea is simple: $W$ plays the role of an energy-like quantity. It is zero only at the equilibrium, positive everywhere else, and strictly decreases along the closed-loop trajectories. Therefore, the system is forced to move toward the origin.\\
+
+This Lyapunov viewpoint explains why stability is relatively transparent for \emph{infinite-horizon} MPC. Suppose that, at time $t$, the controller computes an input sequence that minimizes the infinite-horizon cost
+\[
+V_t^\infty(x,\mathbf{u}) = \sum_{k=t}^{\infty} g_k(x_k,u_k),
+\]
+subject to the system dynamics. If the minimum is attained, it is natural to define the optimal value function
+\[
+W(x) = \min_{\mathbf{u}} V_t^\infty(x,\mathbf{u}).
+\]
+Now comes the key observation. By Bellman's principle of optimality, if an input sequence is optimal from time $t$, then its tail is optimal from time $t+1$ onward. In other words, after applying the first optimal input $u^*(x_t)$ and reaching the next state $x_{t+1}$, the remaining part of the optimal sequence is still optimal for the optimization problem starting at $t+1$. As a consequence, along the closed-loop trajectory one obtains
+\[
+W(x_{t+1}) = W(x_t) - g_t(x_t,u^*(x_t)).
+\]
+Therefore, if the stage cost satisfies suitable positivity properties, for example if
+\[
+g_t(x_t,u_t) > 0 \qquad \text{for all } x_t\neq 0,
+\]
+then
+\[
+W(x_{t+1}) < W(x_t) \qquad \text{for all } x_t\neq 0.
+\]
+This means that the optimal value function is a natural Lyapunov candidate for the closed-loop system. Under reasonable assumptions, it follows that the origin is asymptotically stable.\\
+
+This argument is very elegant, but it also hides some subtleties. First, an infinite-horizon MPC problem is infinite-dimensional, so from a computational viewpoint it is not directly implementable as stated. Second, one is implicitly assuming that the global minimum exists and is attained. Third, the stage cost must satisfy suitable properties so that the value function is positive definite and decreases strictly along the closed loop. These requirements are analogous in spirit to the assumptions encountered in infinite-horizon LQR.\\
+
+The situation changes significantly for \emph{finite-horizon} MPC. In that case, the same Lyapunov argument does not apply automatically. At time $t$, the controller minimizes a cost over the interval $[t,t+T]$. At time $t+1$, however, the optimization problem is not simply the tail of the previous one: the first stage cost has disappeared, but a new term has entered at the end of the horizon. Therefore, the controller at time $t+1$ is minimizing a \emph{different} objective. As a result, the optimizer changes, and the finite-horizon value function is not automatically decreasing along the closed-loop trajectory.
+
+This is the fundamental reason why closed-loop stability is immediate for infinite-horizon optimal control, but not for finite-horizon receding-horizon MPC. For finite-horizon MPC, stability must be enforced through additional design choices. This will be the starting point for the next part of the discussion.
