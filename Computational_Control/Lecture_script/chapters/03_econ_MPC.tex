@@ -1,0 +1,270 @@
+In the previous chapters we have always implicitly assumed that we are regulating the steady state $x_S = 0$, $u_S = 0$.\\
+However, in many applications we are interested in regulating to a nonzero setpoint, or even tracking a time-varying reference trajectory. In particular, we typically want the plant to operate at a desired working point $x_S \neq 0$, and we can allow for a constant input $u_S$ that compensates for constant disturbances.
+
+If a desired equilibrium point $(x_S,u_S)$ is known, it satisfies
+$$
+x_S = A x_S + B u_S.
+$$
+In this case, MPC can be used to stabilize the system around this point by introducing the shifted variables
+$$
+\tilde{x}_k = x_k - x_S, \qquad \tilde{u}_k = u_k - u_S.
+$$
+
+Substituting into the system dynamics $x_{k+1} = A x_k + B u_k$, we obtain
+$$
+\tilde{x}_{k+1} = A \tilde{x}_k + B \tilde{u}_k,
+$$
+which has exactly the same form as the original system. Therefore, in the new coordinates, the regulation problem becomes a standard stabilization problem around the origin.
+
+The finite-horizon MPC cost can then be written as
+$$
+V(x_0) = \min_{\mathbf{\tilde{x}},\mathbf{\tilde{u}}} \sum_{k=0}^{K-1} \left( \tilde{x}_k^\top Q \tilde{x}_k + \tilde{u}_k^\top R \tilde{u}_k \right) + \tilde{x}_K^\top S \tilde{x}_K.
+$$
+
+For linear systems, this change of variables is \textbf{inconsequential}, since it does not modify the structure of the optimal control problem: the dynamics remain linear, the cost remains quadratic, and the constraints (if any) remain affine. As a result, regulating the system to $(x_S,u_S)$ is equivalent to regulating the shifted system to the origin.\\
+
+But how do we decide the steady state $(x_S,u_S)$ to which we want to regulate? In some cases, this may be given by the problem specification, e.g., if we want to track a reference trajectory. In other cases, it can be derived from first principles, e.g., by solving the steady-state equations of the system.\\
+In other cases, specifications indicate a desidered steady state $(x_{\text{spec},u_S})$, but the system cannot be stabilized around it. In this case, we can use MPC to find the closest stabilizable point to the desired one, by solving the following optimization problem:
+\[
+\begin{aligned}
+\min_{x_S, u_S} \quad & \| x_S - x_{\text{spec}} \|_{Q_S}^2 + \| u_S - u_{\text{spec}} \|_{R_S}^2 \\
+\text{subject to} \quad & \begin{bmatrix}I - A & -B\end{bmatrix}\begin{bmatrix}
+x_S \\ u_S
+\end{bmatrix} = 0\\
+& (x_S, u_S) \in \mathcal{X} \times \mathcal{U},
+\end{aligned}
+\]
+where $\mathcal{X}$ and $\mathcal{U}$ are the state and input constraint sets, respectively. The condition $\begin{bmatrix}I - A & -B\end{bmatrix}\begin{bmatrix}x_S \\ u_S
+\end{bmatrix} = 0$ ensures that the chosen point is an equilibrium of the system, while the cost function penalizes deviations from the desired specifications.\\
+This optimization problem is typically solved offline and serves to compute a feasible and stabilizable steady-state target $(x_S,u_S)$. The resulting pair is then used as the reference for the MPC regulator, which is responsible for driving the system to this point while satisfying constraints.\\
+
+Many modern control problems present \textbf{complex performance metrics} that cannot be easily captured by a quadratic cost function. For example, in chemical processes, the economic performance of the system may depend on nonlinear functions of the state and input variables, such as production rates, energy consumption, or profit margins. In such cases, we can use \textbf{economic MPC}, which allows for more general cost functions that directly reflect the economic objectives of the system.\\
+
+Thus, let $\ell(x,u)$ be a general stage cost function that captures the economic performance of the system like economic losses, energy use , cost of material, etc. The economic MPC problem assumes that
+\begin{itemize}
+    \item $\ell(x,u)$ is a continuos function;
+    \item $\ell(x,u)$ is lower bounded in the domain
+\end{itemize}
+While remember that in MPC we were assuming that
+\begin{itemize}
+    \item $g(x_S,u_S) = 0$ (i.e., the system is at equilibrium at the desired setpoint);
+    \item $g(x,u)\geq 0$
+    \item $g(x,u)$ is radially unbounded, continuos, zero at the origin, and strictly increasing.
+    \item e.g. $g(x,u) = x^\top Q x + u^\top R u$.
+\end{itemize}
+One possible approach is to separate the economic objective from the dynamic control problem. In particular, the economic cost is handled at the steady-state level, while MPC is used to steer the system toward the corresponding optimal operating point.\\
+Given a general stage cost $\ell(x,u)$, we first define the steady-state optimization problem
+\[
+\begin{aligned}
+\min_{x_S,u_S} \quad & \ell(x_S,u_S) \\
+\text{subject to} \quad & x_S = f(x_S,u_S), \\
+& (x_S,u_S) \in \mathcal{X} \times \mathcal{U}.
+\end{aligned}
+\]
+This problem determines the economically optimal equilibrium of the system.\\
+
+The resulting pair $(x_S,u_S)$ is then used as a reference for the MPC controller, which is designed to track this steady state using a standard quadratic cost. In this way, the economic objective is indirectly enforced through steady-state optimization, while the MPC ensures closed-loop stability and constraint satisfaction.\\
+
+This approach is typically implemented by solving the steady-state optimization problem offline, or at a slower time scale than the MPC loop. However, this separation introduces some limitations. The closed-loop trajectory is generally suboptimal from an economic point of view, since the stage cost $\ell(x,u)$ is not minimized during transients. Moreover, the controller cannot exploit transient behavior to improve performance, and its response to disturbances may be economically inefficient. On the other hand, the resulting MPC problem remains a standard linear-quadratic program, which is computationally efficient and well understood.\\
+
+An alternative approach is to incorporate the economic objective directly into the dynamic optimization problem. This leads to the formulation of \textbf{economic MPC}, in which the stage cost $\ell(x,u)$ is optimized along the entire predicted trajectory:
+\[
+V(x) = \min_{\mathbf{x},\mathbf{u}} \sum_{k=0}^{K-1} \ell(x_k,u_k)
+\]
+subject to
+\[
+x_{k+1} = f(x_k,u_k), \quad x_0 = x, \quad x_k \in \mathcal{X}, \quad u_k \in \mathcal{U}.
+\]
+In contrast to the previous approach, there is no separation between steady-state optimization and tracking. The controller directly optimizes the economic performance over the prediction horizon, resulting in a \emph{single time-scale} scheme in which both transient and steady-state behavior are determined simultaneously.\\
+
+As a consequence, the controller computes control actions that generate an economically optimal trajectory, rather than simply driving the system toward a precomputed steady state. In particular, the optimal operation may not correspond to a fixed equilibrium, and the controller may intentionally exploit transient behavior if this improves the overall performance.\\
+This increased flexibility comes at the price of a more challenging optimization problem. Since the cost $\ell(x,u)$ is in general nonlinear and not necessarily convex, the resulting optimal control problem may be non-convex and harder to solve in real time. Moreover, standard quadratic Lyapunov arguments used in tracking MPC no longer apply directly, and additional conditions are required to guarantee stability.\\
+
+On the other hand, economic MPC is particularly well suited for nonlinear systems and applications in which performance is naturally described by non-quadratic criteria, such as energy efficiency or economic profit. In these cases, directly optimizing $\ell(x,u)$ allows the controller to fully exploit the system dynamics and constraints to achieve improved closed-loop performance.\\
+
+A key issue with economic MPC arises from the fact that the stage cost $\ell(x,u)$ is not designed to enforce convergence to a steady state. In particular, it may happen that there exist pairs $(x,u)$ that are not equilibria of the system, i.e.,
+\[
+x \neq f(x,u),
+\]
+for which
+\[
+\ell(x,u) < \ell(x_S,u_S),
+\]
+where $(x_S,u_S)$ is an optimal steady state.\\
+This situation is not pathological; on the contrary, it is quite common in practice. Since $\ell(x,u)$ reflects instantaneous economic performance, it may be advantageous for the system to operate away from equilibrium, for instance by exploiting transient dynamics or time-varying operating conditions.\\
+
+As a consequence, convergence to a steady state is no longer guaranteed nor even desired in general. The optimal closed-loop behavior may correspond to trajectories that do not settle at an equilibrium, such as periodic or more complex operating regimes.\\
+This highlights a fundamental difference with standard tracking MPC: convergence to a steady state is not part of the control specification. Instead, the objective is to optimize economic performance over time, possibly at the expense of steady-state operation.\\
+
+However, this increased flexibility comes with important challenges. First, operating away from equilibrium can lead to behaviors that are harder to analyze and predict. In particular, stability and boundedness of the closed-loop trajectories are not automatically guaranteed. Second, without additional conditions or constraints, the controller may generate trajectories that are economically optimal in the short term but undesirable from a safety or robustness perspective.\\
+
+A fundamental design choice in economic MPC is the length of the prediction horizon. In principle, the most natural formulation is the infinite-horizon problem
+\[
+\sum_{k=0}^{\infty} \ell(x_k,u_k),
+\]
+which directly captures the long-term economic performance of the system.\\
+The infinite-horizon formulation has a clear economic interpretation, as it reflects the cumulative cost over an indefinite future. This is particularly meaningful in continuous operation settings, where there is no natural terminal time and performance is evaluated over the long run. Moreover, constraints are enforced over the entire trajectory, which ensures boundedness of the closed-loop system by construction.\\
+However, the infinite-horizon problem is infinite-dimensional and therefore computationally intractable in practice. For this reason, it cannot be solved directly in real time.\\
+
+As a result, practical implementations rely on a finite-horizon approximation of the form
+\[
+\sum_{k=0}^{K-1} \ell(x_k,u_k).
+\]
+This leads to a tractable optimization problem that can be solved online within the MPC framework.\\
+In standard tracking MPC, a finite horizon provides a good approximation of the infinite-horizon problem, since the system is driven toward an equilibrium and the contribution of the tail beyond the horizon can be neglected or approximated. In economic MPC, this argument no longer holds. Since the optimal behavior may not converge to a steady state, the portion of the trajectory beyond the horizon can have a significant impact on performance.\\
+
+This mismatch introduces several potential issues. First, the controller may favor trajectories that yield low cost within the prediction horizon but lead to poor behavior afterward, as future consequences are not accounted for. In particular, the system may move toward regions from which recovery is difficult or expensive, resulting in undesirable or even unstable behavior.\\
+Second, feasibility problems may arise at the end of the horizon. Due to state and input constraints, not all states reached within the horizon can be extended to admissible infinite trajectories. This can lead to situations in which the optimization problem becomes infeasible at future time steps.\\
+
+A common approach to mitigate these issues is to augment the finite-horizon problem with a terminal constraint. In particular, one enforces that the predicted trajectory reaches a feasible steady state at the end of the horizon, i.e.,
+\[
+x_K = x_S, \qquad u_K = u_S,
+\]
+where $(x_S,u_S)$ is an admissible equilibrium of the system.\\
+This modification preserves the computational tractability of the finite-horizon formulation, while introducing a mechanism to guarantee that the predicted trajectory can be extended beyond the horizon in a feasible way. In other words, by constraining the terminal state to an equilibrium, one ensures that there exists a feasible infinite-horizon continuation, thereby recovering \emph{recursive feasibility}.\\
+
+From this perspective, the terminal constraint provides an explicit characterization of what constitutes a feasible infinite-horizon trajectory: a trajectory is admissible if it can be steered to a steady state that satisfies the system dynamics and constraints.\\
+However, the introduction of a terminal constraint also raises important questions regarding the resulting closed-loop behavior. In particular, it is no longer immediate whether the closed-loop system is stable, or whether the resulting trajectory achieves optimal economic performance. The terminal constraint enforces convergence to a steady state, which may restrict the ability of the controller to exploit economically favorable transient or non-equilibrium operation.
+
+Finally, it is important to emphasize that, as in any MPC scheme, the closed-loop system does not follow the predicted trajectory exactly. At each time step, only the first control input is applied,
+\[
+u_k = u^*(x_k),
+\]
+and the optimization problem is solved again at the next step with updated state information. As a result, the actual closed-loop trajectory is generated by the repeated solution of the finite-horizon problem, and not by the open-loop prediction computed at a single time instant.\\
+
+To better illustrate the difference between standard tracking MPC and economic MPC, consider the following linear system
+\[
+x_{k+1} = A x_k + B u_k, \qquad 
+A = \begin{bmatrix} \tfrac{1}{2} & 1 \\ 0 & \tfrac{3}{4} \end{bmatrix}, \quad 
+B = \begin{bmatrix} 0 \\ 1 \end{bmatrix},
+\]
+with input constraint
+\[
+u \in \mathcal{U} = [-1,1],
+\]
+and economic stage cost
+\[
+\ell(x,u) = q^\top x + r u, \qquad 
+q = \begin{bmatrix} -2 \\ 2 \end{bmatrix}, \quad r = -10.
+\]
+The first step consists in computing the optimal steady state by solving
+\[
+\begin{aligned}
+\min_{x_S,u_S} \quad & \ell(x_S,u_S) \\
+\text{subject to} \quad & x_S = A x_S + B u_S, \\
+& u_S \in \mathcal{U}.
+\end{aligned}
+\]
+To find the steady states we need to solve
+\[
+(I - A )x_S = B u_S,
+\]
+which gives
+\[
+\begin{bmatrix}
+    \frac{1}{2} & -1 \\
+    0 & \frac{1}{4}
+\end{bmatrix}
+\begin{bmatrix}
+x_{S,1} \\ x_{S,2}
+\end{bmatrix}
+= \begin{bmatrix}0 \\ u_S
+\end{bmatrix}
+\]
+Since the cost is linear and the constraints define a polyhedral set, this is a linear program, and the optimum is attained at an extreme point of the feasible set. Thus we only need to evaluate the cost at the two vertices of the input constraint, which gives
+$$\text{if}\; u_S = -1, \quad x_S = \begin{bmatrix} -4 \\ -8 \end{bmatrix}, \quad \ell(x_S,u_S) = 18,$$
+$$\text{if}\; u_S = 1, \quad x_S = \begin{bmatrix} 4 \\ 8 \end{bmatrix}, \quad \ell(x_S,u_S) =- 18.$$
+
+The solution $(x_S^*,u_S^*)$ represents the economically optimal equilibrium.\\
+Once $(x_S^*,u_S^*)$ is determined, two fundamentally different control strategies can be constructed.\\
+
+In the standard MPC tracking approach, the optimal steady state is used as a reference. Defining the shifted variables
+\[
+\tilde{x}_k = x_k - x_S^*, \qquad \tilde{u}_k = u_k - u_S^*,
+\]
+the controller minimizes a quadratic tracking cost of the form
+\[
+g(\tilde{x},\tilde{u}) = \tilde{x}^\top Q \tilde{x} + \tilde{u}^\top R \tilde{u},
+\]
+driving the system to $(x_S^*,u_S^*)$ as fast as possible. A terminal constraint $\tilde{x}_K = 0$ (equivalently $x_K = x_S^*$) is typically imposed to ensure stability. The resulting optimization problem is a quadratic program.\\
+
+In contrast, economic MPC directly uses the economic cost in the receding horizon problem:
+\[
+\min_{\mathbf{x},\mathbf{u}} \sum_{k=0}^{K-1} \ell(x_k,u_k)
+\]
+subject to
+\[
+x_{k+1} = A x_k + B u_k, \qquad x_k \in \mathcal{X}, \quad u_k \in \mathcal{U},
+\]
+together with a terminal constraint $x_K = x_S^*$ to guarantee feasibility. In this case, since both the dynamics and the cost are linear, the resulting problem is a linear program.\\
+
+The key difference between the two approaches lies in the objective being optimized. Tracking MPC enforces convergence to the economically optimal steady state and prioritizes stability and regulation performance, but does not optimize the economic cost during transients. Economic MPC, on the other hand, optimizes the economic objective along the entire trajectory, potentially exploiting transient behavior to improve performance.\\
+
+From a computational perspective, tracking MPC leads to a quadratic program, which is typically well-conditioned and easier to solve reliably in real time. Economic MPC may lead to linear or nonlinear programs depending on the form of $\ell(x,u)$, and can be more challenging, although in this particular example it reduces to a linear program.\\
+
+Now we want to analyze the closed loop behavior. In particular we want to understand if the closed loop stability is guaranteed and if the economic cost is minimez.
+In standard tracking MPC, the terminal constraint plays a crucial role in proving asymptotic stability. Indeed, when the cost is built from a positive definite tracking stage cost
+\[
+g(\tilde{x},\tilde{u}),
+\]
+with
+\[
+g(0,0)=0, \qquad g(\tilde{x},\tilde{u})>0 \quad \text{for } \tilde{x}\neq 0,
+\]
+the finite-horizon optimal value function can be used as a Lyapunov function for the closed-loop system. The key argument is the same shifted-sequence argument already discussed in the previous chapter. If the optimal predicted trajectory satisfies the terminal constraint
+\[
+\tilde{x}_K = 0,
+\]
+then, after applying the first optimal input, a feasible candidate sequence at the next time step is obtained by shifting the previously optimal sequence and appending the equilibrium input $\tilde{u}=0$. Since the appended terminal stage cost is zero, one obtains
+\[
+W(f(\tilde{x},u_0^*(\tilde{x}))) \leq W(\tilde{x}) - g(\tilde{x},u_0^*(\tilde{x})) \leq W(\tilde{x}),
+\]
+which shows that $W$ decreases along the closed-loop trajectories and is therefore a valid Lyapunov function.\\
+
+The natural question is whether the same idea can be applied to economic MPC. Suppose that we consider the finite-horizon economic MPC problem with terminal constraint
+\[
+x_K = x_S,
+\]
+where $(x_S,u_S)$ is an admissible steady state. The same shifted-sequence construction remains feasible: after applying the first optimal control input, one can shift the optimal predicted trajectory and append the steady-state input $u_S$ at the end of the horizon. Therefore, feasibility is preserved. However, the cost argument changes in a fundamental way.\\
+Indeed, for economic MPC the stage cost is $\ell(x,u)$, which is not positive definite with respect to the steady state and is not, in general, minimized at $(x_S,u_S)$. As a consequence, the shifted-sequence argument only yields
+\[
+W(f(x,u_0^*(x))) \leq W(x) - \ell(x,u_0^*(x)) + \ell(x_S,u_S).
+\]
+This inequality is not sufficient to conclude that $W$ decreases. In fact, it may happen that
+\[
+\ell(x_S,u_S) > \ell(x,u_0^*(x)),
+\]
+so the right-hand side can be larger than $W(x)$. Therefore, unlike in tracking MPC, the optimal finite-horizon value function is \emph{not} automatically a Lyapunov function for the closed-loop system.\\
+
+This observation has an important conceptual consequence. In economic MPC, asymptotic stability of the steady state is not guaranteed by the terminal constraint alone. The terminal constraint guarantees recursive feasibility, but not necessarily convergence to the equilibrium. This is perfectly consistent with the economic interpretation of the problem: the controller is asked to optimize economic performance, not to minimize the distance from the steady state. If operating away from equilibrium is economically more favorable, then the closed-loop system may prefer persistent transient behavior or even non-equilibrium operating regimes.\\
+
+For this reason, asymptotic convergence to the steady state is not always the most relevant objective in economic MPC. In some applications, one may actually achieve a lower long-run cost by not converging to an equilibrium. For nonlinear systems, it is even possible that economically preferable periodic trajectories exist, so that oscillatory operation can outperform steady-state operation. Hence, from the viewpoint of economic MPC, the relevant performance question is often not whether the state converges to $x_S$, but whether the closed-loop system achieves good \emph{average} economic performance over time.\\
+
+This leads to a weaker, but very meaningful, notion of closed-loop performance. Consider the closed-loop trajectory generated by economic MPC with terminal constraint $x_S$. Under suitable assumptions, one can prove the following asymptotic average performance bound:
+\[
+\limsup_{t\to\infty}\frac{1}{t}\sum_{k=0}^{t-1}\ell(x_k,u_k)\leq \ell(x_S,u_S).
+\]
+This result states that the asymptotic average economic performance of the closed loop is no worse than the cost of operating permanently at the chosen steady state. In other words, even if the trajectory does not converge to $(x_S,u_S)$, its long-run average performance is at least as good as the steady-state economic benchmark.\\
+The proof again relies on the terminal constraint and on the shifted-sequence argument. From feasibility of the shifted trajectory, one obtains
+\[
+W(f(x,u_0^*(x))) \leq W(x)-\ell(x,u_0^*(x))+\ell(x_S,u_S).
+\]
+Summing this inequality along the closed-loop trajectory for $k=0,\dots,t-1$ yields
+\[
+\sum_{k=0}^{t-1}\ell(x_k,u_k)
+\leq
+t\,\ell(x_S,u_S) + W(x_0)-W(x_t).
+\]
+Dividing by $t$ gives
+\[
+\frac{1}{t}\sum_{k=0}^{t-1}\ell(x_k,u_k)
+\leq
+\ell(x_S,u_S) + \frac{W(x_0)-W(x_t)}{t}.
+\]
+If the value function remains bounded along the closed loop, the last term vanishes as $t\to\infty$, from which the average performance bound follows.\\
+
+It is important to stress the meaning of this result. The function $W$ is not a Lyapunov function here, because it is not required to decrease at every time step. Instead, it acts as a storage-like quantity that allows us to compare the accumulated closed-loop cost with the steady-state benchmark. Thus, the conclusion is not asymptotic stability, but an \emph{asymptotic average cost guarantee}.\\
+
+We can now summarize the main message of this discussion. In economic MPC, a terminal constraint is essential to guarantee recursive feasibility of the receding-horizon scheme. However, unlike in tracking MPC, the terminal constraint alone is not enough to guarantee asymptotic stability of the optimal steady state. The closed-loop system may generate economically efficient trajectories that do not converge to an equilibrium, and this is not necessarily undesirable. In fact, even when the trajectory eventually converges to the steady state, economic MPC may still outperform standard tracking MPC because it optimizes the transient behavior as well. Over long operating periods, and especially in the presence of recurrent disturbances, this transient economic advantage can accumulate and lead to significantly improved overall performance.\\
+
+Additional assumptions can be introduced to recover asymptotic stability of the steady state in economic MPC. These conditions are stronger than those used in standard tracking MPC and are not automatic consequences of the basic formulation. Their role is precisely to connect economic optimality with a suitable notion of dissipativity or storage of the system, so that the closed-loop behavior can again be related to equilibrium convergence. In the absence of such additional assumptions, the most natural guarantee remains the asymptotic average performance property discussed above.

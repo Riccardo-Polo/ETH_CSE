@@ -126,19 +126,18 @@ We say that the optimal cost is $V_0(x_0)$.
 \subsection{Dynamic Programming for LQR}
 
 Let us now specialize the dynamic programming recursion to the Linear Quadratic Regulator (LQR) problem.  
-Recall that the value function represents the optimal \emph{cost-to-go}, i.e. the minimum cost achievable from a given state when acting optimally from that point onward.
-
+Recall that the value function represents the optimal \emph{cost-to-go}, i.e. the minimum cost achievable from a given state when acting optimally from that point onward.\\
 A key observation in the LQR setting is that the terminal cost is quadratic in the state.  
 Indeed, from the problem formulation we have
 \[
 V_T(x) = x^\top S x ,
 \]
-which is a convex quadratic function since $S \succeq 0$.
-
+which is a convex quadratic function since $S \succeq 0$.\\
 The main idea of the LQR derivation is to show that the value function $V_t(x)$ is also quadratic and has the form of $V_t(x) = x^\top\, P_t \,x$ for some symmetric positive semidefinite matrix $P_t$.\\
 We will then show that the matrices $P_t$ can then be computed recursively by working \emph{backward in time} starting from the terminal time $T$.
 Eventually the the optimal control input $u_t$ will be computed as a solution of a convex quadratic optimization problem, which admits a closed-form solution.\\
 
+\begin{proof}
 To derive the recursion, consider the dynamic programming stage problem at time $t$ where the value function is 
 $$ 
 V_t(x) = \min_{u} \Big( x^\top\, Q \,x + u^\top\, R \,u + V_{t+1}(A x + B u) \Big).
@@ -202,9 +201,8 @@ B^\top P_{t+1} A}
 x \\[6pt]
 &= x^\top \textcolor{blue}{P_t} x
 \end{align*}
-To complete the proof one should check that $P_t$ is positive semidefinite. Here we homit the proof. $\quad  \blacksquare$\\
-In cocnlusion we have been able to derive a closed-form expression for the optimal control input $u^*$ for the LQR problem.Be aware that this solution is not valid anymore if the problem becomes constrained.\\
- 
+To complete the proof one should check that $P_t$ is positive semidefinite. Here we homit the proof.\\
+In cocnlusion we have been able to derive a closed-form expression for the optimal control input $u^*$ for the LQR problem.Be aware that this solution is not valid anymore if the problem becomes constrained.\end{proof} 
 We summerize here the main results:
 \begin{theorembox}[Optimal LQR solution]
 \textbf{Backward induction} 

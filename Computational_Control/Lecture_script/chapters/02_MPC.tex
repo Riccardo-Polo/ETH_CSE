@@ -398,6 +398,358 @@ This means that the optimal value function is a natural Lyapunov candidate for t
 
 This argument is very elegant, but it also hides some subtleties. First, an infinite-horizon MPC problem is infinite-dimensional, so from a computational viewpoint it is not directly implementable as stated. Second, one is implicitly assuming that the global minimum exists and is attained. Third, the stage cost must satisfy suitable properties so that the value function is positive definite and decreases strictly along the closed loop. These requirements are analogous in spirit to the assumptions encountered in infinite-horizon LQR.\\
 
-The situation changes significantly for \emph{finite-horizon} MPC. In that case, the same Lyapunov argument does not apply automatically. At time $t$, the controller minimizes a cost over the interval $[t,t+T]$. At time $t+1$, however, the optimization problem is not simply the tail of the previous one: the first stage cost has disappeared, but a new term has entered at the end of the horizon. Therefore, the controller at time $t+1$ is minimizing a \emph{different} objective. As a result, the optimizer changes, and the finite-horizon value function is not automatically decreasing along the closed-loop trajectory.
+The situation changes significantly for \emph{finite-horizon} MPC. In that case, the same Lyapunov argument does not apply automatically. At time $t$, the controller minimizes a cost over the interval $[t,t+T]$. At time $t+1$, however, the optimization problem is not simply the tail of the previous one: the first stage cost has disappeared, but a new term has entered at the end of the horizon. Therefore, the controller at time $t+1$ is minimizing a \emph{different} objective. As a result, the optimizer changes, and the finite-horizon value function is not automatically decreasing along the closed-loop trajectory.\\
+This is the fundamental reason why closed-loop stability is immediate for infinite-horizon optimal control, but not for finite-horizon receding-horizon MPC. For finite-horizon MPC, stability must be enforced through additional design choices. This will be the starting point for the next part of the discussion.\\
 
-This is the fundamental reason why closed-loop stability is immediate for infinite-horizon optimal control, but not for finite-horizon receding-horizon MPC. For finite-horizon MPC, stability must be enforced through additional design choices. This will be the starting point for the next part of the discussion.
+A classical way to recover a Lyapunov argument for finite-horizon MPC is to modify the optimization problem by imposing a \textbf{terminal constraint}. The simplest choice is the \emph{zero terminal constraint}, namely
+\[
+x_{t+T}=0.
+\]
+The corresponding finite-horizon optimal control problem becomes
+\begin{theorembox}[Finite-horizon MPC with zero terminal constraint]
+Given the current state $x_t$, define
+\begin{align*}
+W_T(x_t)= \min_{\mathbf{x},\mathbf{u}} \quad & \sum_{k=t}^{t+T-1} g_k(x_k,u_k) \\
+\text{s.t.}\quad & x_{k+1}=f(x_k,u_k), \qquad k=t,\dots,t+T-1,\\
+& x_t \text{ given},\\
+& x_{t+T}=0.
+\end{align*}
+\end{theorembox}
+
+The intuition is very simple. By forcing the predicted state to reach the origin at the end of the horizon, we make the finite-horizon problem look more similar to the infinite-horizon one. In particular, once the terminal state is the equilibrium, the tail of the optimal trajectory can be completed in a natural way by keeping the system at the origin with zero input, provided that
+\[
+f(0,0)=0.
+\]
+This terminal condition restores the key mechanism that was missing in the plain finite-horizon case. Indeed, suppose that at time $t$ the optimal solution of the MPC problem is
+\[
+\{\tilde u_t,\tilde u_{t+1},\dots,\tilde u_{t+T-1}\},
+\]
+with associated state trajectory
+\[
+\{\tilde x_t,\tilde x_{t+1},\dots,\tilde x_{t+T}\},
+\]
+where by construction
+\[
+\tilde x_{t+T}=0.
+\]
+After applying the first control input $\tilde u_t$, the system reaches the state
+\[
+x_{t+1}=\tilde x_{t+1}.
+\]
+At time $t+1$, a natural feasible candidate input sequence is then obtained by taking the \emph{tail} of the previous optimizer and appending the zero input:
+\[
+\{\tilde u_{t+1},\tilde u_{t+2},\dots,\tilde u_{t+T-1},0\}.
+\]
+This is feasible because the previous optimal trajectory already satisfies $\tilde x_{t+T}=0$, and the appended input $u=0$ keeps the system at the equilibrium.\\
+Therefore, the optimal cost at time $t+1$ can be upper bounded by the cost of this feasible candidate. This gives
+\begin{align*}
+W_T(x_{t+1})
+&\le \sum_{k=t+1}^{t+T} g_k(x_k,u_k)\\
+&= \sum_{k=t}^{t+T-1} g_k(x_k,u_k) - g_t(x_t,u_t) + g_{t+T}(x_{t+T},u_{t+T}).
+\end{align*}
+Since $x_{t+T}=0$ and we append $u_{t+T}=0$, the last term vanishes under the standard assumption that the stage cost is zero at the equilibrium:
+\[
+g_{t+T}(0,0)=0.
+\]
+Hence,
+\[
+W_T(x_{t+1}) \le W_T(x_t) - g_t(x_t,u_t).
+\]
+If, in addition, the stage cost is positive away from the origin, then for every $x_t\neq 0$ we obtain
+\[
+W_T(x_{t+1}) < W_T(x_t).
+\]
+This shows that the optimal value function $W_T$ decreases along the closed-loop trajectories, and therefore it becomes a Lyapunov candidate for the closed-loop system.
+
+\begin{theorembox}[Asymptotic stability with zero terminal constraint]
+Under the usual assumptions of feasibility, attainment of the minimum, $f(0,0)=0$, and positivity of the stage cost, the equilibrium $x=0$ is asymptotically stable for the closed-loop system generated by finite-horizon MPC with terminal constraint
+\[
+x_{t+T}=0.
+\]
+\end{theorembox}
+
+The proof is essentially the shifted-sequence argument above. The terminal constraint ensures that the optimal trajectory at time $t$ can be transformed into a feasible candidate at time $t+1$ simply by removing the first input and appending the zero input at the end. This gives a monotonic decrease of the value function, exactly as required by Lyapunov theory. We report here a more formal proof for completeness.
+\begin{proof}
+Let
+\[
+W(x_t)=\min_{\mathbf{u},\mathbf{x}} \sum_{k=t}^{t+T-1} g(x_k,u_k)
+\]
+subject to
+\[
+x_{k+1}=f(x_k,u_k), \qquad x_t \text{ given}, \qquad x_{t+T}=0.
+\]
+We want to compare the optimal cost at time $t+1$ with the one at time $t$. By definition,
+\begin{align*}
+W(x_{t+1})
+&= \min \sum_{k=t+1}^{t+T} g(x_k,u_k) \\
+&= \min \left( \sum_{k=t}^{t+T-1} g(x_k,u_k) - g(x_t,u_t) + g(x_{t+T},u_{t+T}) \right).
+\end{align*}
+By definition of the minimum, this quantity is less than or equal to the same expression evaluated at any feasible input sequence. In particular, let
+\[
+\tilde{\mathbf{u}}
+=
+\argmin_{\mathbf{u},\mathbf{x}}
+\sum_{k=t}^{t+T-1} g(x_k,u_k)
+\]
+be the optimizer of the MPC problem at time $t$, with associated state trajectory
+\[
+\tilde{x}_{t+1},\tilde{x}_{t+2},\dots,\tilde{x}_{t+T},
+\qquad \tilde{x}_{t+T}=0.
+\]
+Now construct a feasible candidate input sequence for the problem at time $t+1$ by taking the tail of the previous optimal sequence and appending the input
+\[
+u_{t+T}=0.
+\]
+Since $\tilde{x}_{t+T}=0$ and $f(0,0)=0$, this implies
+\[
+x_{t+T+1}=0,
+\]
+so the terminal constraint is satisfied also at time $t+1$.\\
+Evaluating the cost at this feasible candidate yields
+\begin{align*}
+W(x_{t+1})
+&\le
+\sum_{k=t+1}^{t+T} g(\tilde{x}_k,\tilde{u}_k) \\
+&=
+\sum_{k=t}^{t+T-1} g(\tilde{x}_k,\tilde{u}_k)
+- g(\tilde{x}_t,\tilde{u}_t)
++ g(\tilde{x}_{t+T},u_{t+T}).
+\end{align*}
+Because $\tilde{x}_{t+T}=0$ and $u_{t+T}=0$, and assuming $g(0,0)=0$, we obtain
+\begin{align*}
+W(x_{t+1})
+&\le
+\sum_{k=t}^{t+T-1} g(\tilde{x}_k,\tilde{u}_k)
+- g(\tilde{x}_t,\tilde{u}_t) \\
+&=
+W(x_t)-g(\tilde{x}_t,\tilde{u}_t) \\
+&\le W(x_t).
+\end{align*}
+
+Hence the optimal value function is non-increasing along the closed-loop trajectories. If moreover
+\[
+g(x,u)>0 \qquad \forall x\neq 0,
+\]
+then
+\[
+W(x_{t+1}) < W(x_t) \qquad \forall x_t\neq 0,
+\]
+so $W$ is a Lyapunov function for the closed-loop system. Therefore, the equilibrium $x=0$ is asymptotically stable.
+\end{proof}
+
+The zero terminal constraint is conceptually very appealing because it gives a clean and direct stability argument. However, it can also be quite restrictive. Requiring the predicted state to reach the origin exactly in $T$ steps may be impossible for some initial conditions, especially when the horizon is short or constraints are tight. In other words, stability can be obtained, but possibly at the price of a reduced feasible set.\\
+
+The zero terminal constraint is only one possible way to guarantee stability of finite-horizon MPC. More generally, several families of sufficient conditions can be used:
+\begin{itemize}
+    \item choosing the prediction horizon $T$ large enough;
+    \item imposing a zero terminal constraint;
+    \item imposing a suitable \textbf{terminal region} constraint for the state;
+    \item combining terminal ingredients, such as terminal constraints and terminal penalties.
+\end{itemize}
+The common idea behind all these approaches is to recover, in one form or another, a Lyapunov-like decrease of the optimal cost along the closed-loop trajectories. The precise technical construction changes from one method to another, but the objective is always the same: to ensure that the receding-horizon controller does not merely optimize over the next $T$ steps, but also induces a long-term stabilizing behavior.\\
+
+When discussing MPC stability results, a few important subtleties should always be kept in mind.\\
+First, throughout the analysis we implicitly assume that the MPC optimization problem is \textbf{feasible}. This is a nontrivial assumption. In particular, with a zero terminal constraint the problem may easily become infeasible, because not every state can be driven exactly to the origin in $T$ steps while satisfying the constraints.\\
+Second, future feasibility may depend on the control action selected at the current time. Thus, it is not enough to have feasibility only at the initial time: one would like feasibility to be preserved as the horizon recedes. This issue is often referred to as \emph{recursive feasibility}, and it is closely connected to the choice of terminal ingredients.\\
+Third, all these arguments assume that the \textbf{global minimum} of the optimization problem is found. This is automatic in the convex quadratic MPC problems discussed so far, but it becomes more delicate in more general nonlinear or nonconvex settings.\\
+For these reasons, stability of MPC is not only a matter of optimization, but also of careful controller design. The horizon length, the stage cost, and the terminal ingredients must be selected jointly so that the resulting receding-horizon law is both feasible and stabilizing.
+
+\subsection{Disturbance rejection}
+
+So far, the MPC design has been discussed mainly in nominal conditions, that is, under the assumption that the model is exact and that no unknown perturbation acts on the system. In practice, however, disturbances are unavoidable. Depending on the application, the controller may be required to achieve different levels of robustness.
+
+\begin{theorembox}[Disturbance rejection specifications]
+In an MPC problem, robustness against disturbances may refer to different objectives:
+\begin{enumerate}
+    \item \textbf{rejection at steady state}, that is, \textbf{zero offset};
+    \item \textbf{rejection during the transient}, namely a good response while the disturbance is acting and being compensated;
+    \item \textbf{guaranteed constraint satisfaction} despite disturbances.
+\end{enumerate}
+\end{theorembox}
+
+These are related but distinct goals. A controller may remove the steady-state error and still react poorly during the transient. Conversely, a controller may have a reasonable transient behavior but fail to guarantee that state and input constraints are respected under uncertainty. In this subsection we focus on the first two aspects: zero steady-state offset and transient disturbance rejection.
+
+\subsubsection{Zero steady-state offset and incremental MPC}
+
+It is useful to remember that MPC is, in the end, a nonlinear static feedback law of the form
+\[
+u_t = u^*(x_t).
+\]
+This observation immediately suggests a possible weakness. If the plant requires a \emph{nonzero} constant input in order to keep the state at the desired equilibrium, then a standard MPC formulation centered at the origin may fail to achieve
+\[
+x_t \to 0.
+\]
+In other words, a constant disturbance or a model mismatch may produce a \textbf{steady-state offset}. This issue is especially visible in the presence of:
+\begin{itemize}
+    \item input disturbances,
+    \item process noise,
+    \item multiplicative uncertainty.
+\end{itemize}
+Moreover, trying to compensate this effect by choosing very small input weights may lead to poor numerical conditioning of the optimization problem. A standard remedy is to reformulate the controller in \textbf{incremental form}. Instead of using the input $u_t$ directly as the manipulated variable, one introduces the input increment
+\[
+\Delta u_t
+\]
+and imposes the update law
+\[
+u_{t+1}=u_t+\Delta u_t.
+\]
+This is equivalent to augmenting the plant with an input integrator. If the original nominal model is
+\[
+x_{t+1}=Ax_t+Bu_t,
+\]
+then the augmented model becomes
+\[
+\begin{bmatrix}
+x_{t+1}\\[1mm]
+u_{t+1}
+\end{bmatrix}
+=
+\begin{bmatrix}
+A & B\\
+0 & I
+\end{bmatrix}
+\begin{bmatrix}
+x_t\\[1mm]
+u_t
+\end{bmatrix}
++
+\begin{bmatrix}
+0\\
+I
+\end{bmatrix}
+\Delta u_t.
+\]
+The optimization problem is then written in terms of $\Delta u_t$ rather than $u_t$. This has two important consequences. First, the controller acquires an \textbf{integral action}, which is exactly what is needed to remove steady-state offsets caused by constant disturbances. Second, the input penalty in the stage cost now penalizes changes in the control signal, that is, it penalizes $\Delta u_t$ rather than the absolute value of $u_t$. As a consequence, the controller naturally prefers smooth input profiles.\\
+Hence, the incremental formulation can be interpreted as an \textbf{integral nonlinear feedback law}: the feedback structure is still given by MPC, but the plant seen by the optimizer includes an integrator on the input channel. This is the basic mechanism used in MPC to obtain zero steady-state offset against constant disturbances.
+
+\subsubsection{Disturbance rejection during transients}
+
+Removing the steady-state error is often not enough. In many applications, the controller should also react well \emph{while} the disturbance is affecting the system. A common strategy in MPC is based on two steps:
+\begin{enumerate}
+    \item estimate the disturbance using the available measurements and the plant model;
+    \item correct the steady-state target using the estimated disturbance.
+\end{enumerate}
+The idea is the following. The nominal prediction model alone cannot explain the measured plant behavior when a disturbance is present. Therefore, an additional disturbance variable is introduced and estimated online. The estimate is then used to shift the equilibrium that the MPC controller should track.\\
+Unless better prior information is available, a very common choice is to model the disturbance as \textbf{constant}:
+\[
+d_{t+1}=d_t,
+\qquad d_t \in \mathbb{R}^{n_d},
+\qquad n_d \le n.
+\]
+This means that the unknown perturbation is assumed to vary slowly compared with the system dynamics, so that over the time scale of interest it can be regarded as approximately constant.
+
+\paragraph{Step 1: Disturbance estimation}
+Assume that the plant is described by the model
+\[
+x_{t+1}=Ax_t+Bu_t+B_d d_t,
+\]
+where $d_t$ is an unknown disturbance entering through the matrix $B_d$. Since $d_t$ is not measured, it must be estimated from the observed evolution of the state.\\
+A simple and effective choice is a Luenberger-type disturbance observer. One first predicts the next state using the current state, the applied input, and the current disturbance estimate:
+\[
+\hat x_{t+1}=Ax_t+Bu_t+B_d \hat d_t.
+\]
+Then the disturbance estimate is corrected using the prediction error:
+\[
+\hat d_{t+1}
+=
+\hat d_t + L\bigl(x_{t+1}-\hat x_{t+1}\bigr),
+\]
+where $L$ is an observer gain chosen so that
+\[
+I-LB_d
+\]
+is stable.\\
+The logic is very intuitive. If the measured next state differs from the nominal prediction, the mismatch is interpreted as the effect of an unmodeled disturbance. The observer then updates $\hat d_t$ in order to make future predictions consistent with the measurements. In this way, the estimate gradually converges to the constant disturbance that is acting on the plant.
+
+\paragraph{Step 2: correction of the steady-state target}
+
+Once the disturbance has been estimated, the next step is to compute which steady state should be tracked by the controller. If the disturbance were absent, the desired equilibrium for a regulation problem would usually be the origin. However, when a constant disturbance is present, the true equilibrium generally shifts. Therefore, instead of forcing MPC to regulate the state to zero, we first compute a \textbf{disturbance-consistent steady-state target} $(x_s,u_s).$\\
+Under the constant disturbance model, the current estimate $\hat d_t$ is our best approximation of the steady-state disturbance. The corresponding steady-state target can be obtained by solving
+
+\begin{theorembox}[Steady-state target selection]
+\begin{align*}
+\min_{x_s,u_s}\quad & \norm{x_s}_{Q_s}^2 + \norm{u_s}_{R_s}^2\\
+\text{s.t.}\quad &
+\begin{bmatrix}
+I-A & -B
+\end{bmatrix}
+\begin{bmatrix}
+x_s\\
+u_s
+\end{bmatrix}
+=
+B_d \hat d_t,\\
+& x_s \in \mathcal{X},\\
+& u_s \in \mathcal{U}.
+\end{align*}
+\end{theorembox}
+
+The equality constraint is simply the steady-state balance equation for the disturbed system. Indeed, at equilibrium we must have
+\[
+x_s = Ax_s + Bu_s + B_d \hat d_t,
+\]
+which is equivalent to the constraint above. The optimization criterion is used to select, among all admissible equilibria compatible with the disturbance estimate, the one that is preferred according to the weights $Q_s$ and $R_s$.\\
+Once $(x_s,u_s)$ has been computed, the MPC controller is no longer asked to regulate the plant to the nominal origin. Instead, it regulates the \emph{deviations}
+\[
+\tilde x_t = x_t-x_s,
+\qquad
+\tilde u_t = u_t-u_s
+\]
+toward zero. In this way, the controller tracks the correct equilibrium associated with the current disturbance estimate. As the estimate $\hat d_t$ evolves, the target $(x_s,u_s)$ is updated accordingly. This is the basic mechanism that improves disturbance rejection during transients.
+
+\subsubsection{Advanced disturbance models}
+
+The constant-disturbance model is often a good default choice, but it is not the only possibility. A more general principle is summarized by the following statement.
+
+\begin{theorembox}[Good regulator theorem]
+\begin{center}
+\emph{``Every good regulator of a system must be a model of that system.''}
+\end{center}
+\end{theorembox}
+The message is that a controller can reject well only those classes of disturbances that are represented, explicitly or implicitly, in its internal model. Therefore, if better prior knowledge about the disturbance is available, that knowledge should be used.
+
+For instance, the disturbance may be:
+\begin{itemize}
+    \item constant,
+    \item ramp-like,
+    \item periodic.
+\end{itemize}
+This is precisely the viewpoint of the \textbf{internal model principle}: the closed-loop system can reject disturbances belonging to the class that has been modeled in the controller design.\\
+If the disturbance has its own linear dynamics
+\[
+d_{t+1}=A_d d_t,
+\]
+then the plant can be augmented as
+\[
+\begin{bmatrix}
+x_{t+1}\\
+d_{t+1}
+\end{bmatrix}
+=
+\begin{bmatrix}
+A & B_d\\
+0 & A_d
+\end{bmatrix}
+\begin{bmatrix}
+x_t\\
+d_t
+\end{bmatrix}
++
+\begin{bmatrix}
+B\\
+0
+\end{bmatrix}
+u_t.
+\]
+In this form, the disturbance is treated as an additional dynamical state. This model can then be used in two ways:
+\begin{itemize}
+    \item inside the disturbance estimator;
+        \item directly inside the MPC prediction model, instead of merely shifting the steady-state target.
+\end{itemize}
+This framework includes the constant-disturbance model as a special case, obtained by taking
+\[
+A_d = I.
+\]
+More generally, the choice of $A_d$ determines which class of disturbances the controller is able to reject. In the spirit of the internal model principle, one integrator is associated with rejection of step-like disturbances, while more complex models are needed for ramps or periodic signals.\\
+
+\textbf{TO FINISH}
