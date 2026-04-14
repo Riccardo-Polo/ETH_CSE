@@ -1,0 +1,101 @@
+\begin{tikzpicture}[
+    >=Latex,
+    line width=1pt,
+    font=\sffamily
+]
+
+%======================
+% Top plant block
+%======================
+\draw (4.3,3.0) rectangle (8.2,5.0);
+\node[align=center, font=\fontsize{11}{13}\selectfont] at (6.25,4.0) {(FAST) STABLE\\PLANT};
+
+% Input to plant
+\draw[->] (0.5,4.0) -- (4.3,4.0);
+\node[above, font=\fontsize{9}{11}\selectfont] at (2.0,4.3) {input $u$};
+
+% Output from plant
+\draw[-] (8.2,4.0) -- (14.6,4.0);
+\node[above, font=\fontsize{9}{11}\selectfont] at (10.4,4.3) {performance $J(u)$};
+
+% Right vertical return
+\draw[-] (14.6,4.0) -- (14.6,1.0);
+
+%======================
+% Bottom row blocks
+%======================
+
+% Summing node
+\draw (1.2,1.05) circle (0.28);
+\node at (1.2,1.05) {$+$};
+
+% Integrator
+\draw (2.4,0.2) rectangle (4.8,1.9);
+\node[align=center, font=\fontsize{9}{11}\selectfont] at (3.6,1.32) {INTEGRATOR};
+\node[align=center, font=\fontsize{8}{10}\selectfont] at (3.6,0.73)
+{$\hat{u}_{k+1}=\hat{u}_{k}-\delta u_k$};
+
+% Gain triangle (left-pointing)
+\node[
+    draw,
+    isosceles triangle,
+    isosceles triangle apex angle=60,
+    shape border rotate=180,
+    minimum height=1.2cm,
+    minimum width=1.0cm,
+    inner sep=0pt
+] (gain) at (6.2,1.05) {};
+\node[font=\fontsize{9}{11}\selectfont] at (5.98,1.05) {$\alpha$};
+
+% Low-pass filter
+\draw (6.9,0.2) rectangle (9.1,1.9);
+\node[align=center, font=\fontsize{9}{11}\selectfont] at (8.0,1.32) {LOW-PASS};
+\node[align=center, font=\fontsize{9}{11}\selectfont] at (8.0,0.78) {FILTER};
+
+% Multiplier
+\draw (10.1,1.05) circle (0.28);
+\node at (10.1,1.05) {$\times$};
+
+% High-pass filter
+\draw (11.1,0.2) rectangle (13.7,1.9);
+\node[align=center, font=\fontsize{9}{11}\selectfont] at (12.4,1.32) {HIGH-PASS};
+\node[align=center, font=\fontsize{9}{11}\selectfont] at (12.4,0.78) {FILTER};
+
+%======================
+% Connections
+%======================
+
+% Right return into high-pass
+\draw[->] (14.6,1.0) -- (13.7,1.0);
+
+% High-pass to multiplier
+\draw[->] (11.1,1.05) -- (10.38,1.05);
+
+% Sine input to multiplier
+\draw[->] (10.1,-0.75) -- (10.1,0.77);
+\node[below, align=center, font=\fontsize{8}{10}\selectfont] at (9.45,-0.05)
+{$\dfrac{2}{\rho}\,\sin(\omega k)$};
+
+% Multiplier to low-pass
+\draw[->] (9.82,1.05) -- (9.1,1.05);
+
+% Low-pass to gain
+\draw[->] (6.9,1.05) -- (6.5,1.05);
+\node[above, font=\fontsize{9}{11}\selectfont] at (5.2,1.2) {$\delta u$};
+
+% Gain to integrator
+\draw[->] (5.38,1.05) -- (4.8,1.05);
+
+% Integrator to summing node
+\draw[->] (2.4,1.05) -- (1.48,1.05);
+\node[above, font=\fontsize{9}{11}\selectfont] at (2.0,1.38) {$\hat{u}$};
+
+% Sine input to summing node
+\draw[->] (1.2,-0.75) -- (1.2,0.77);
+\node[left, font=\fontsize{8}{10}\selectfont] at (0.95,-0.05) {$\rho\,\sin(\omega k)$};
+
+% Summing node to plant input path
+\draw[-] (0.45,1.05) -- (0.45,4.0);
+\draw[->] (0.45,1.05) -- (0.92,1.05);
+
+\end{tikzpicture}

@@ -1,0 +1,22 @@
+%==================================================
+% First graph: p(y)
+%==================================================
+\begin{tikzpicture}[>=Latex, line width=0.9pt, scale=0.7]
+
+% axes
+\draw[->] (0,-1.4) -- (0,2.9);
+\draw[->] (-1.3,0) -- (4.8,0) node[below right] {$y$};
+
+% red shaded admissible set
+\fill[pattern=north east lines, pattern color=red] (-0.6,-1.0) rectangle (2.2,0);
+
+% labels
+\node at (0.8,2.1) {$p(y)$};
+\node[red] at (2.05,-0.55) {$\mathcal{Y}$};
+
+% curve
+\draw[thick, domain=2.2:3.7, samples=100, smooth]
+  plot (\x,{0.42*(exp(1.15*(\x-2.2))-1)});
+
+\end{tikzpicture}
+

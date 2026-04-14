@@ -1,0 +1,82 @@
+\begin{tikzpicture}[
+    >=Latex,
+    line width=1pt,
+    font=\sffamily
+]
+
+% =========================================================
+% TOP DIAGRAM
+% =========================================================
+
+% --- Top block: iterative optimization algorithm
+\draw[fill=gray!10] (1.0,1.15) rectangle (5.95,2.65);
+\node[align=center, font=\sffamily\fontsize{15}{20}\selectfont] at (3.475,1.90)
+{iterative optimization\\algorithm};
+
+% --- Bottom block: model
+\draw[fill=gray!10] (1.0,-2.75) rectangle (5.95,0.15);
+
+\node[font=\sffamily\fontsize{21}{24}\selectfont] at (3.475,-0.35) {model};
+
+\node[anchor=west, font=\sffamily\fontsize{13}{16}\selectfont] at (1.50,-1.05)
+{$\mathrm{minimize}_{u,y}\quad \Phi(u,y)$};
+
+\node[anchor=west, font=\sffamily\fontsize{13}{16}\selectfont] at (1.70,-1.52)
+{subject to \hspace{0.7em} $y\in\mathcal{Y}$};
+
+\node[anchor=west, font=\sffamily\fontsize{13}{16}\selectfont] at (4,-1.98)
+{$u\in\mathcal{U}$};
+
+\node[anchor=west, font=\sffamily\fontsize{13}{16}\selectfont] at (3.5,-2.45)
+{$y=h(u;w)$};
+
+% --- Plant block
+\draw[fill=gray!10] (8.45,-0.60) rectangle (11.45,1.40);
+\node[font=\sffamily\fontsize{21}{24}\selectfont] at (9.95,0.40) {plant};
+
+% --- Left feedback connection
+\draw[->] (1.0,1.90) -- (0.0,1.90) -- (0.0,-1.25) -- (1.0,-1.25);
+
+% --- Right connection from algorithm/model to plant
+\draw[-] (5.95,1.90) -- (6.95,1.90) -- (6.95,-1.25);
+\draw[->] (6.95,-1.25) -- (5.95,-1.25);
+
+% dashed branch to plant
+\draw[->, dashed, dash pattern=on 4pt off 4pt] (6.95,0.40) -- (8.45,0.40);
+
+% --- Plant output
+\draw[->] (11.45,0.40) -- (12.75,0.40);
+
+% --- Labels
+\node[font=\sffamily\fontsize{18}{20}\selectfont] at (7.95,0.88) {$u^{*}$};
+\node[font=\sffamily\fontsize{18}{20}\selectfont] at (11.95,0.88) {$y^{*}$};
+
+% =========================================================
+% BOTTOM DIAGRAM
+% =========================================================
+
+\begin{scope}[yshift=-7.0cm, draw=red!65!black, text=red!65!black]
+
+% blocks
+\draw[fill=red!20] (0.7,0.4) rectangle (5.5,2.3);
+\node[align=center, font=\sffamily\fontsize{14}{20}\selectfont] at (3.1,1.35)
+{iterative optimization\\algorithm};
+
+\draw[fill=red!20] (7.8,0.1) rectangle (10.6,2.65);
+\node[font=\sffamily\fontsize{20}{24}\selectfont] at (9.2,1.35) {plant};
+
+% forward path
+\draw[->] (5.5,1.35) -- (7.8,1.35);
+\draw[->] (10.6,1.35) -- (12.0,1.35);
+
+% feedback loop
+\draw[-] (11.25,1.35) -- (11.25,-1.0) -- (0.0,-1.0) -- (0.0,1.35);
+\draw[->] (0.0,1.35) -- (0.7,1.35);
+
+% labels
+\node[font=\sffamily\fontsize{18}{20}\selectfont] at (6.6,1.95) {$u$};
+\node[font=\sffamily\fontsize{18}{20}\selectfont] at (11.0,1.95) {$y$};
+
+\end{scope}
+
+\end{tikzpicture}

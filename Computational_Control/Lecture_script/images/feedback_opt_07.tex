@@ -1,0 +1,47 @@
+\begin{tikzpicture}[
+    >=Latex,
+    line width=0.9pt,
+    font=\sffamily
+]
+
+% Summing junction
+\draw (0,0) circle (0.18);
+
+% Plus and minus signs
+\node at (-0.3,0.28) {\small $+$};
+\node at (-0.3,-0.32) {\small $-$};
+
+% Controller block
+\draw (0.7,-0.4) rectangle (2.7,0.4);
+\node at (1.7,0) {Controller};
+
+% System block
+\draw (3.3,-0.4) rectangle (5.1,0.4);
+\node at (4.2,0) {System};
+
+% Input r
+\draw[->] (-1.0,0) -- (-0.18,0);
+\node at (-0.75,0.28) {$r$};
+
+% From summing junction to controller
+\draw[->] (0.18,0) -- (0.7,0);
+
+% Controller to system
+\draw[->] (2.7,0) -- (3.3,0);
+\node at (3.0,-0.28) {$u$};
+
+% Disturbance w
+\draw[->] (4.0,1.1) -- (4.0,0.4);
+\node at (4.23,0.92) {$w$};
+
+% Output y
+\draw[->] (5.1,0) -- (6.3,0);
+\node at (5.85,0.28) {$y$};
+
+% Output node
+\fill (5.65,0) circle (1.5pt);
+
+% Feedback path
+\draw (5.65,0) -- (5.65,-1.0) -- (0,-1.0) -- (0,-0.18);
+
+\end{tikzpicture}

@@ -1,0 +1,66 @@
+\begin{tikzpicture}[
+    >=Latex,
+    line width=1pt,
+    font=\sffamily
+]
+
+
+% =========================================================
+% MIDDLE: input space and preimage
+% =========================================================
+\begin{scope}[xshift=5.6cm, yshift=0cm, draw=black, text=black]
+
+% axes
+\draw[->] (-1.2,0) -- (2.9,0);
+\draw[->] (0,-1.8) -- (0,2.3);
+
+% feasible set shape
+\draw
+    (0.45,1.75)
+    .. controls (0.25,1.15) and (-0.30,0.55) .. (-0.85,0.25)
+    .. controls (-0.35,0.00) and (0.00,-0.55) .. (0.45,-1.35)
+    -- (2.15,1.30)
+    .. controls (1.55,1.30) and (0.95,1.40) .. (0.45,1.75);
+
+% point and labels
+\fill (1.72,1.0) circle (1.4pt);
+\node[font=\fontsize{15}{17}\selectfont] at (1.5,1.10) {$u$};
+\node[font=\fontsize{10}{22}\selectfont] at (0.8,0.55) {$h^{-1}(\mathcal{Y};w)$};
+
+\end{scope}
+
+% =========================================================
+% RIGHT: input space with red highlighted region
+% =========================================================
+\begin{scope}[xshift=10.9cm, yshift=0cm]
+
+% red highlighted polygon
+\filldraw[fill=red!20, draw=red, line width=1pt]
+    (-0.45,1.30) --
+    (2.2,1.25) --
+    (0.2,-1.20) --
+    (-1.35,0.00) -- cycle;
+
+% axes
+\draw[->] (-1.1,0) -- (2.6,0);
+\draw[->] (0,-1.7) -- (0,2.2);
+
+% feasible set shape
+\draw
+    (0.45,1.75)
+    .. controls (0.25,1.15) and (-0.30,0.55) .. (-0.85,0.25)
+    .. controls (-0.35,0.00) and (0.00,-0.55) .. (0.45,-1.35)
+    -- (2.15,1.30)
+    .. controls (1.55,1.30) and (0.95,1.40) .. (0.45,1.75);
+
+% point and labels
+\fill (1.72,1.0) circle (1.4pt);
+\node[font=\fontsize{15}{17}\selectfont] at (1.5,1.10) {$u$};
+\node[font=\fontsize{10}{22}\selectfont] at (0.8,0.55) {$h^{-1}(\mathcal{Y};w)$};
+
+% labels
+\node[font=\sffamily\fontsize{12}{16}\selectfont] at (-2,1.95) {input space};
+
+\end{scope}
+
+\end{tikzpicture}
