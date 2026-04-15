@@ -1,4 +1,4 @@
-\documentclass[11pt,a4paper]{article}
+\documentclass[11pt,a4paper]{book}
 
 \usepackage[a4paper,margin=1in]{geometry}
 \usepackage[T1]{fontenc}
@@ -90,10 +90,45 @@
 \tableofcontents
 \newpage
 
-\section{Systems theory basics}
-\input{chapters/01_ST_basics}
+\part{Introduction}
+
+\chapter{Introduction to Model Predictive Control}
+\input{chapters/02_MPC.tex}
+\newpage
+\chapter{Systems theory basics}
+\input{chapters/01_ST_basics.tex}
+\newpage
+\chapter{Unconstrained Control}
+\input{chapters/03_unconstr_contro.tex}
+\newpage
+\chapter{Introduction to ConvexOptimization}
+\input{chapters/04_convex_optimization.tex}
+
+\part{Nominal MPC}
+\newpage
+\chapter{Constrained Finite Time Optimal Control}
+\input{chapters/05_CFTOC.tex}
 
 \newpage
-\section{Model Predictive Control}
-\input{chapters/02_MPC}
+\chapter{Invariance}
+\input{chapters/06_invariance.tex}
+
+\newpage
+\chapter{Feasibility and Stability}
+\input{chapters/07_feas_stab.tex}
+
+\part{Practical MPC}
+\chapter{Practical Issues in MPC}
+\input{chapters/08_practical_issues.tex}
+
+\part{Robust MPC}
+\chapter{Robust MPC 1}
+\input{chapters/09_robus_mpc_1.tex}
+
+\chapter{Robust MPC 2}
+\input{chapters/10_robust_mpc_2.tex}
+
+\part{Implementation Methods}
+\chapter{Implementation Methods}
+\input{chapters/11_implementation_methods.tex}
 \end{document}
