@@ -2,10 +2,9 @@
 
 In many automation problems, the control objective is not only to stabilize the plant, but to drive it toward an \emph{optimal operating point}. This operating point is typically characterized by steady-state specifications rather than by transient performance requirements.\\
 
-The setting we have in mind is the following. The plant is nonlinear, but it is either already stable or has been pre-stabilized by a lower-level controller. Therefore, the main control task is no longer to stabilize an unstable system from scratch, but to determine and maintain the best admissible steady state. This is particularly relevant when the plant must operate continuously around an equilibrium and performance is mainly determined by the chosen operating point.\\
+The \textbf{setting} we have in mind is the following. The plant is nonlinear, but it is either already stable or has been pre-stabilized by a lower-level controller. Therefore, the main control task is no longer to stabilize an unstable system from scratch, but to \textbf{determine and maintain the best admissible steady state}. This is particularly relevant when the plant must operate continuously around an equilibrium and performance is mainly determined by the chosen operating point.\\
 
-A second important feature is that, in many applications, an accurate dynamic model is not available. Even when a rough dynamical description exists, it may be too uncertain to support a reliable model-based dynamic optimization over a prediction horizon. On the other hand, steady-state relations are often easier to obtain from physical insight, experiments, maps, or data. For this reason, one may prefer to formulate the control objective directly in terms of steady-state optimization.
-
+A second important feature is that, in many applications, an accurate dynamic model is not available. Even when a rough dynamical description exists, it may be too uncertain to support a reliable model-based dynamic optimization over a prediction horizon. On the other hand, steady-state relations are often easier to obtain from physical insight, experiments, maps, or data. For this reason, one may prefer to formulate the control objective directly in terms of steady-state optimization.\\
 The steady-state specifications are usually expressed in terms of optimality criteria. Typical examples are:
 \begin{itemize}
     \item maximizing yield;
@@ -14,7 +13,7 @@ The steady-state specifications are usually expressed in terms of optimality cri
 \end{itemize}
 Hence, instead of assigning a set-point a priori, one wants to \emph{compute} the best steady state according to a given performance index.\\
 
-This optimization is rarely unconstrained. In practice, several manipulated inputs must be selected simultaneously, and each of them is subject to physical or operational limits. Moreover, the desired operating point must satisfy several steady-state constraints, such as safety limits, balance equations, admissibility conditions, or exact power and mass balances. Therefore, the target selection problem is naturally a constrained steady-state optimization problem.\\
+This optimization is rarely unconstrained. In practice, several manipulated inputs must be selected simultaneously, and each of them is subject to physical or operational limits. Moreover, the desired operating point must satisfy several steady-state constraints, such as safety limits, balance equations, admissibility conditions, or exact power and mass balances. Therefore, the target selection problem is naturally a \textbf{constrained steady-state optimization problem}.\\
 
 Another crucial aspect is that the optimal steady state is generally not fixed once and for all. It depends on exogenous factors that affect the plant equilibrium. These may include external disturbances, slowly varying demand, ambient conditions, or unknown plant parameters. As these quantities change, the economically or operationally optimal steady state changes as well. The controller must then adapt the plant operation so as to regulate the system around the new optimal equilibrium.\\
 
@@ -47,7 +46,7 @@ y = Cx + Du,
 \]
 where $x$ is the state, $u$ is the manipulated input, $w$ is an exogenous variable or disturbance, and $y$ is the controlled output or performance variable of interest.\\
 
-The key assumption is that the plant is \emph{exponentially stable}. This means that, for constant inputs $u$ and constant disturbances $w$, the state converges exponentially fast to a unique equilibrium. Therefore, after transients have died out, the output is determined only by the constant values of $u$ and $w$. This motivates the introduction of the \emph{steady-state map}
+The key assumption is that the plant is \emph{exponentially stable}. This means that, for constant inputs $u$ and constant disturbances $w$, the state converges exponentially fast to a unique equilibrium. Therefore, \textbf{after transients have died out, the output is determined only by the constant values of $u$ and $w$}. This motivates the introduction of the \emph{steady-state map}
 \[
 y = Hu + Lw.
 \]
@@ -83,7 +82,7 @@ So $H$ is the steady-state gain from the manipulated input $u$ to the output $y$
 
 This also answers the question about the conditions on $A$. In order to define the steady-state map in this form, $A$ must be invertible. In particular, if the plant is exponentially stable, then all eigenvalues of $A$ have strictly negative real part. Hence $0$ cannot be an eigenvalue of $A$, and therefore $A$ is automatically nonsingular. So invertibility of $A$ is not an additional restriction here: it already follows from exponential stability.\\
 
-The conclusion is that, for a fast and exponentially stable plant, the dynamic relation between $u$ and $y$ can be replaced at steady state by the static map
+The conclusion is that, f\textbf{for a fast and exponentially stable plant}, the dynamic relation between $u$ and $y$ can be replaced at steady state by the static map
 \[
 y = Hu + Lw,
 \]

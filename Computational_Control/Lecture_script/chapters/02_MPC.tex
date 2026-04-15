@@ -14,7 +14,8 @@ Usually, the constraint sets are convex, e.g., polytopes.
 \end{theorembox}
 
 One could solve this optimization problem in a \textbf{one-shot} fashion (i.e., open-loop strategy), obtaining an optimal input sequence $u_0, \ldots, u_{T-1}$ for the given initial state $x_0$, instead of a state-feedback policy as in the unconstrained case (where $u_t = \Gamma_t x_t$).\\ However, if disturbances or model mismatch cause the system to deviate from the predicted trajectory, the previously computed control sequence is no longer optimal. As a result, the system will follow a different trajectory than expected (see Figures \ref{fig:mpc_01} and \ref{fig:mpc_02}).\\
-To address this issue, the optimal control problem must be re-solved using the updated state information. Since we assume a Markovian system, the current state contains all the information needed to compute an optimal control sequence for the future. This implies that the optimization problem must be solved repeatedly, at each time step, within one sampling interval.
+
+To address this issue, the optimal control problem must be re-solved using the updated state information. Since we assume a \textbf{Markovian system}, the current state contains all the information needed to compute an optimal control sequence for the future. This implies that the optimization problem must be solved repeatedly, at each time step, within one sampling interval.
 
 \begin{figure}[!ht]
 \centering
@@ -68,7 +69,7 @@ $u^*(x)$ is determined by\footnote{Notation: $k$ is the index for the optimizati
 \end{align*}
 \end{theorembox}
 
-The parametric nature of the problem immediately raises the question of whether the resulting control strategy is \emph{feedforward} or \emph{feedback}. Although the optimization problem computes an open-loop input sequence, the receding horizon implementation introduces feedback implicitly. Indeed, at each time step the optimization problem is solved using the current state $x_t$, and only the first input of the optimal sequence is applied. Therefore, the implemented control law can be written as
+The parametric nature of the problem immediately raises the question of whether the resulting control strategy is \emph{feedforward} or \emph{feedback}. Although the optimization problem computes an open-loop input sequence, the receding horizon implementation \textbf{introduces feedback implicitly}. Indeed, at each time step the optimization problem is solved using the current state $x_t$, and only the first input of the optimal sequence is applied. Therefore, the implemented control law can be written as
 \[
 u_t = u^*(x_t),
 \]
@@ -82,11 +83,11 @@ which defines a \textbf{state-feedback control law}. One can have a visual intui
 
 We can establish some properties about this optimization problem:
 \begin{itemize}
-    \item Under \textbf{continuity} assumptions on the cost and the dynamics, the minimum cost is a constinuous function of the initial state $x$.
+    \item Under \textbf{continuity} assumptions on the cost and the dynamics, the minimum cost is a continuous function of the initial state $x$.
     \item Under \textbf{compactness} assumptions on the constraints, the parametric optimization problem admits a solution for all $x$ in the feasible set.
-    \item The map $x \mapsto u^*(x)$ is not necessarily continuos for a general cost function
+    \item The map $x \mapsto u^*(x)$ is not necessarily continuous for a general cost function
 \end{itemize}
-In the case of linear dynamics, quadratic cost, and convex constraints, the optimization problem is a convex quadratic program (QP) parametrized in the initial state $x$. In this case, the map $x \mapsto u^*(x)$ is piecewise affine and continuous. However, in general, the control law induced by MPC can be nonlinear and non-smooth.
+In the case of linear dynamics, quadratic cost, and convex constraints, the optimization problem is a \textbf{convex quadratic program (QP)} parametrized in the initial state $x$. In this case, the map $x \mapsto u^*(x)$ is piecewise affine and continuous. However, in general, the control law induced by MPC can be nonlinear and non-smooth.
 \begin{theorembox}[MPC control law]
 As a consequence, MPC can be interpreted as a \textbf{memory-less, nonlinear, time-invariant feedback control law}. The nonlinearity arises from the presence of constraints, even when the system dynamics are linear and the cost is quadratic.\\
 \end{theorembox}
@@ -106,13 +107,13 @@ Two different questions can be asked:
 \end{enumerate}
 To solve this we observe that the cost is not quadratic and that the cost of applying inouts is discounted over time. Furthermore the state is penalized only at the end of the horizon.\\
 Thus the optimal solution is to simply wait for the last time step and then apply $u_{T} = -x_{T}$, which yields a cost of $|x_0|^2$.\\
-In contrast, the MPC feedback law is given by the control law $x \mapsto u^*(x)=0$.\\
-A key observation is that the optimal trajectory associated with the finite-horizon problem is, in general, \textbf{never realized in closed loop}, even in the absence of disturbances or model mismatch. This is because at each time step the optimization problem is re-solved with a shifted horizon, leading to a different optimal sequence than the one computed previously.
+In contrast, the MPC feedback law is given by the control law $x \mapsto u^*(x)=0$. This is because at each time step the optimization problem is solved with a shifted horizon, and the optimal input sequence is always to wait until the end of the horizon and then apply $u_{t+T}=-x_{t+T}$. Therefore, at each time step, the first input of the optimal sequence is zero.\\
+A key observation is that the \textbf{optimal trajectory} associated with the finite-horizon problem is, in general, \textbf{never realized in closed loop}, even in the absence of disturbances or model mismatch. This is because at each time step the optimization problem is re-solved with a shifted horizon, leading to a different optimal sequence than the one computed previously.
 $\blacksquare$
 
 \medskip
 
-Consider now the unconstrained linear-quadratic problem:
+Consider now the \textbf{unconstrained linear-quadratic} problem:
 \begin{align*}
 \min_{\mathbf{x},\mathbf{u}} \quad & \sum_{t=0}^{T-1} \left( x_t^\top Q x_t + u_t^\top R u_t \right) + x_T^\top S x_T, \quad Q,S \succeq 0,\; R \succ 0 \\
 \text{s.t.} \quad & x_{t+1} = A x_t + B u_t.
@@ -140,7 +141,7 @@ while MPC recomputes the problem and applies again
 \[
 u_1^{\text{MPC}} = {-(R + B^\top \textcolor{red}{P_1} B)^{-1} B^\top \textcolor{red}{P_1} A} x_1.
 \]
-Therefore, even in the unconstrained case, MPC does not reproduce the finite-horizon optimal control sequence beyond the first step.
+Therefore, even in the unconstrained case, \textbf{MPC does not reproduce the finite-horizon optimal control sequence beyond the first step}.
 
 \subsection{Implementation of MPC}
 The implementation of MPC requires solving an optimization problem at each time step. We show two main approaches to implement MPC:
@@ -151,25 +152,22 @@ The implementation of MPC requires solving an optimization problem at each time 
         \item Abundant offline computational resources are required 
         \item Large memory is required to store the function $u^*(\cdot)$
     \end{itemize}
-    \item Compute the \textbf{value} of the function $U^*(\cdot)$ \textbf{online} at each time step by solving the optimization problem.
+    \item Compute the \textbf{value} of the function $u^*(\cdot)$ \textbf{online} at each time step by solving the optimization problem.
     \begin{itemize}
-        \item It is ogten a tractable optimization problem.
+        \item It is often a tractable optimization problem.
         \item It has limited time to perform computation online.
     \end{itemize}
 \end{enumerate}
 
 \subsubsection{Explicit MPC}
 
-Explicit MPC corresponds to the first implementation strategy: instead of solving the optimization problem online at each sampling instant, we try to compute the feedback law$ x \mapsto u^*(x) $
-offline.\\
+Explicit MPC corresponds to the \textbf{first implementation strategy}: instead of solving the optimization problem online at each sampling instant, we try to compute the feedback law $ x \mapsto u^*(x) $ \textbf{offline}.\\
 We have already seen one important case. In the \textbf{unconstrained linear MPC} case, the optimizer is simply the first element of the finite-horizon LQR solution. Therefore, the applied input can be written as
 \[
 u_t = u^*(x_t)=\Gamma_0 x_t,
 \]
 so the control law is linear.\\
-
-The natural question is what happens when \emph{constraints} are introduced. Consider the standard constrained linear MPC problem
-
+The natural question is what happens when \textbf{constraints are introduced}. Consider the standard constrained linear MPC problem
 \begin{theorembox}[Linear MPC with linear constraints]
 \begin{align*}
 \min_{\mathbf{u},\mathbf{x}} \quad &
@@ -177,8 +175,8 @@ The natural question is what happens when \emph{constraints} are introduced. Con
 \text{s.t.}\quad
 & x_{k+1}=Ax_k+Bu_k, \qquad k=0,\dots,T-1, \\
 & x_0=x, \\
-& x_k \in \mathcal{X}, \qquad \mathcal{X}=\{x \in \mathbb{R}^n : Cx \le d\}, \\
-& u_k \in \mathcal{U}, \qquad \mathcal{U}=\{u \in \mathbb{R}^m : Eu \le f\},
+& \textcolor{red}{x_k \in \mathcal{X}}, \qquad \mathcal{X}=\{x \in \mathbb{R}^n : Cx \le d\}, \\
+& \textcolor{red}{u_k \in \mathcal{U}}, \qquad \mathcal{U}=\{u \in \mathbb{R}^m : Eu \le f\},
 \end{align*}
 with $ Q,S \succeq 0, \qquad R \succ 0 $.\\
 This is the most common MPC formulation: linear dynamics, quadratic cost, and polyhedral state/input constraints.
@@ -313,7 +311,6 @@ This example shows the main structural property of explicit MPC:
     \item the control law is \textbf{piecewise affine},
     \item each affine expression is valid in a region where the same set of constraints is active.
 \end{itemize}
-
 The reason is the following. Once the active constraints are known, the KKT conditions reduce to a linear system in the decision variables and the multipliers. Solving that linear system gives an optimizer that depends \emph{affinely} on the parameter $x$. When the active set changes, a different affine expression is obtained. Therefore, the state space is partitioned into regions, and on each region the controller is affine.\\
 
 Although the explicit solution is conceptually appealing, it becomes difficult to use in large problems. In practice:
@@ -323,7 +320,7 @@ Although the explicit solution is conceptually appealing, it becomes difficult t
     \item the offline computation required to determine all regions can be very long,
     \item even online, one must determine in which region the current state lies before evaluating the affine law.
 \end{itemize}
-As a consequence, explicit MPC is mainly attractive when the system dimension is small and the sampling time is so short that solving a quadratic program online would be too expensive. For larger systems, the most common approach is instead to solve the MPC optimization problem online at each sampling instant.
+As a consequence, explicit MPC is mainly \textbf{attractive when the system dimension is small and the sampling time is so short that solving a quadratic program online would be too expensive}. For larger systems, the most common approach is instead to solve the MPC optimization problem online at each sampling instant.
 
 \subsection{Stability}
 
@@ -332,7 +329,7 @@ A useful way to think about MPC is as a \emph{feedback design tool}. Once the pr
 u_t = u^*(x_t).
 \]
 Even though the optimization problem computes an open-loop input sequence, only the first input is applied and the problem is solved again at the next time step. Therefore, the implemented controller is a \textbf{static, time-invariant, nonlinear feedback law}. The nonlinearity does not necessarily come from the dynamics; it already appears because of the repeated constrained optimization.\\
-From this perspective, the main question is no longer only how to solve the optimization problem, but whether the resulting closed-loop system is stable. There are two conceptually different ways to approach this question. The first is an \emph{analysis} point of view: one tries to compute the control law $u^*(\cdot)$ explicitly and then study the stability of the closed-loop dynamics. In general, this is difficult, because the MPC law can be piecewise affine or more generally nonlinear and non-smooth. The second is a \emph{design} point of view: instead of computing the feedback law explicitly, one looks for conditions on the design parameters $T,Q,R,S$ that guarantee closed-loop stability directly. This is the more useful viewpoint in practice.\\
+From this perspective, the main question is no longer only how to solve the optimization problem, but \textbf{whether the resulting closed-loop system is stable}. There are two conceptually different ways to approach this question. The first is an \emph{analysis} point of view: one tries to compute the control law $u^*(\cdot)$ explicitly and then study the stability of the closed-loop dynamics. In general, this is difficult, because the MPC law can be piecewise affine or more generally nonlinear and non-smooth. The second is a \emph{design} point of view: instead of computing the feedback law explicitly, one looks for \textbf{conditions on the design parameters $T,Q,R,S$ that guarantee closed-loop stability directly}. This is the more useful viewpoint in practice.\\
 
 To study stability, the standard tool is Lyapunov analysis. Consider a discrete-time system
 \[
@@ -350,7 +347,7 @@ The equilibrium $x=0$ is said to be \textbf{stable} if
 In words, if the initial condition is sufficiently close to the equilibrium, then the entire trajectory remains close to it for all future times.
 \end{theorembox}
 
-Stability alone only guarantees that trajectories do not move far away from the equilibrium. A stronger notion is asymptotic stability, which additionally requires convergence to the equilibrium.
+Stability alone only guarantees that trajectories do not move far away from the equilibrium. A \textbf{stronger notion is asymptotic stability}, which additionally requires convergence to the equilibrium.
 
 \begin{theorembox}[Asymptotically stable equilibrium]
 The equilibrium $x=0$ is \textbf{asymptotically stable} if it is stable and
@@ -372,7 +369,7 @@ W(f(x)) &< W(x) \qquad \forall x\neq 0.
 Then the equilibrium $x=0$ is asymptotically stable.
 \end{theorembox}
 
-The idea is simple: $W$ plays the role of an energy-like quantity. It is zero only at the equilibrium, positive everywhere else, and strictly decreases along the closed-loop trajectories. Therefore, the system is forced to move toward the origin.\\
+The idea is simple: $W$ plays the role of an \textbf{energy-like quantity}. It is zero only at the equilibrium, positive everywhere else, and strictly decreases along the closed-loop trajectories. Therefore, the system is forced to move toward the origin.\\
 
 This Lyapunov viewpoint explains why stability is relatively transparent for \emph{infinite-horizon} MPC. Suppose that, at time $t$, the controller computes an input sequence that minimizes the infinite-horizon cost
 \[
@@ -394,14 +391,14 @@ then
 \[
 W(x_{t+1}) < W(x_t) \qquad \text{for all } x_t\neq 0.
 \]
-This means that the optimal value function is a natural Lyapunov candidate for the closed-loop system. Under reasonable assumptions, it follows that the origin is asymptotically stable.\\
+This means that the \textbf{optimal value function is a natural Lyapunov candidate} for the closed-loop system. Under reasonable assumptions, it follows that the origin is asymptotically stable.\\
 
 This argument is very elegant, but it also hides some subtleties. First, an infinite-horizon MPC problem is infinite-dimensional, so from a computational viewpoint it is not directly implementable as stated. Second, one is implicitly assuming that the global minimum exists and is attained. Third, the stage cost must satisfy suitable properties so that the value function is positive definite and decreases strictly along the closed loop. These requirements are analogous in spirit to the assumptions encountered in infinite-horizon LQR.\\
 
-The situation changes significantly for \emph{finite-horizon} MPC. In that case, the same Lyapunov argument does not apply automatically. At time $t$, the controller minimizes a cost over the interval $[t,t+T]$. At time $t+1$, however, the optimization problem is not simply the tail of the previous one: the first stage cost has disappeared, but a new term has entered at the end of the horizon. Therefore, the controller at time $t+1$ is minimizing a \emph{different} objective. As a result, the optimizer changes, and the finite-horizon value function is not automatically decreasing along the closed-loop trajectory.\\
-This is the fundamental reason why closed-loop stability is immediate for infinite-horizon optimal control, but not for finite-horizon receding-horizon MPC. For finite-horizon MPC, stability must be enforced through additional design choices. This will be the starting point for the next part of the discussion.\\
+The situation changes significantly for \emph{finite-horizon} MPC. In that case, the same Lyapunov argument does not apply automatically. At time $t$, the controller minimizes a cost over the interval $[t,t+T]$. At time $t+1$, however, the optimization problem is not simply the tail of the previous one: the first stage cost has disappeared, but a new term has entered at the end of the horizon. Therefore, the controller at time $t+1$ is minimizing a \emph{different} objective. As a result, the optimizer changes, and the \textbf{finite-horizon value function is not automatically decreasing along the closed-loop trajectory}.\\
+This is the fundamental reason why closed-loop stability is immediate for infinite-horizon optimal control, but not for finite-horizon receding-horizon MPC. \textbf{For finite-horizon MPC, stability must be enforced through additional design choices}. This will be the starting point for the next part of the discussion.\\
 
-A classical way to recover a Lyapunov argument for finite-horizon MPC is to modify the optimization problem by imposing a \textbf{terminal constraint}. The simplest choice is the \emph{zero terminal constraint}, namely
+A classical way to \textbf{recover a Lyapunov argument} for finite-horizon MPC is to modify the optimization problem by imposing a \textbf{terminal constraint}. The simplest choice is the \emph{zero terminal constraint}, namely
 \[
 x_{t+T}=0.
 \]
@@ -537,7 +534,7 @@ W(x_{t+1}) < W(x_t) \qquad \forall x_t\neq 0,
 so $W$ is a Lyapunov function for the closed-loop system. Therefore, the equilibrium $x=0$ is asymptotically stable.
 \end{proof}
 
-The zero terminal constraint is conceptually very appealing because it gives a clean and direct stability argument. However, it can also be quite restrictive. Requiring the predicted state to reach the origin exactly in $T$ steps may be impossible for some initial conditions, especially when the horizon is short or constraints are tight. In other words, stability can be obtained, but possibly at the price of a reduced feasible set.\\
+The zero terminal constraint is conceptually very appealing because it gives a clean and direct stability argument. However, it can also be \textbf{quite restrictive}. Requiring the predicted state to reach the origin exactly in $T$ steps may be impossible for some initial conditions, especially when the horizon is short or constraints are tight. In other words, \textbf{stability can be obtained, but possibly at the price of a reduced feasible set}.\\
 
 The zero terminal constraint is only one possible way to guarantee stability of finite-horizon MPC. More generally, several families of sufficient conditions can be used:
 \begin{itemize}
@@ -550,7 +547,7 @@ The common idea behind all these approaches is to recover, in one form or anothe
 
 When discussing MPC stability results, a few important subtleties should always be kept in mind.\\
 First, throughout the analysis we implicitly assume that the MPC optimization problem is \textbf{feasible}. This is a nontrivial assumption. In particular, with a zero terminal constraint the problem may easily become infeasible, because not every state can be driven exactly to the origin in $T$ steps while satisfying the constraints.\\
-Second, future feasibility may depend on the control action selected at the current time. Thus, it is not enough to have feasibility only at the initial time: one would like feasibility to be preserved as the horizon recedes. This issue is often referred to as \emph{recursive feasibility}, and it is closely connected to the choice of terminal ingredients.\\
+Second, \textbf{future feasibility may depend on the control action selected at the current time}. Thus, it is not enough to have feasibility only at the initial time: one would like feasibility to be preserved as the horizon recedes. This issue is often referred to as \emph{recursive feasibility}, and it is closely connected to the choice of terminal ingredients.\\
 Third, all these arguments assume that the \textbf{global minimum} of the optimization problem is found. This is automatic in the convex quadratic MPC problems discussed so far, but it becomes more delicate in more general nonlinear or nonconvex settings.\\
 For these reasons, stability of MPC is not only a matter of optimization, but also of careful controller design. The horizon length, the stage cost, and the terminal ingredients must be selected jointly so that the resulting receding-horizon law is both feasible and stabilizing.
 
@@ -575,7 +572,7 @@ It is useful to remember that MPC is, in the end, a nonlinear static feedback la
 \[
 u_t = u^*(x_t).
 \]
-This observation immediately suggests a possible weakness. If the plant requires a \emph{nonzero} constant input in order to keep the state at the desired equilibrium, then a standard MPC formulation centered at the origin may fail to achieve
+This observation immediately suggests a \textbf{possible weakness}. If the plant requires a \emph{nonzero} constant input in order to keep the state at the desired equilibrium, then a standard MPC formulation centered at the origin may fail to achieve
 \[
 x_t \to 0.
 \]

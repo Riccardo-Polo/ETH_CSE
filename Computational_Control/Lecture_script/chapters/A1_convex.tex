@@ -1,0 +1,211 @@
+Convex optimization appears repeatedly in computational control. In unconstrained LQR, the stage optimization is a convex quadratic problem and can be solved in closed form. In constrained MPC, the online problem is typically a convex quadratic program. In feedback optimization, first-order methods, projections, and dual updates are all built on convexity assumptions. For this reason, it is useful to collect in one place the basic facts on convex sets, convex functions, and optimality conditions that make these methods computationally tractable.\\
+
+At a high level, modern computers are particularly effective at two things: linear algebra and iteration. Linear algebra makes it possible to manipulate vectors and matrices efficiently, solve linear systems, and exploit structure in large-scale problems. Iteration makes it possible to repeat simple update rules until convergence. Numerical optimization sits exactly at the intersection of these two capabilities. This is one of the main reasons why optimization-based control can be implemented in real time when the underlying problem has the right structure, and convexity is precisely the property that provides such structure.\\
+
+We consider the generic optimization problem
+\begin{equation}
+\begin{aligned}
+    \min_{x \in X} \quad & f(x) \\
+    \text{s.t.} \quad & g(x) \leq 0, \\
+                      & h(x) = 0,
+\end{aligned}
+\label{eq:generic_opt_problem}
+\end{equation}
+where $x \in X \subseteq \mathbb{R}^n$ is the decision variable, $f : \mathbb{R}^n \to \mathbb{R}$ is the cost function, $g : \mathbb{R}^n \to \mathbb{R}^m$ collects inequality constraints, and $h : \mathbb{R}^n \to \mathbb{R}^p$ collects equality constraints.\\
+This formulation is general enough to include many control problems. For example, the finite-horizon MPC problem can be written in this form after stacking all predicted states and inputs into a single vector. The key question is then not only whether a minimizer exists, but whether it can be computed efficiently and reliably online. Convexity provides a positive answer in a large class of relevant cases.
+
+\subsection{Convex sets and convex functions}
+
+We start from the geometric notion of convexity.\\
+A set $X \subseteq \mathbb{R}^n$ is called \emph{convex} if for every $x',x'' \in X$ and every $t \in [0,1]$,
+$$
+    tx' + (1-t)x'' \in X.
+$$
+In words, whenever two points belong to the set, the whole line segment joining them also belongs to the set.\\
+\
+A function $\phi : \mathbb{R}^n \to \mathbb{R}$ is called \emph{convex} on a convex domain if for every $x',x''$ in its domain and every $t \in [0,1]$,
+$$
+    \phi(tx' + (1-t)x'') \leq t \phi(x') + (1-t)\phi(x'').
+$$
+This means that the graph of the function lies below the straight line joining the function values at the two endpoints.\\
+
+These two definitions are closely related. A fundamental fact is that if $g$ is convex, then every sublevel set
+$$
+    \{x \mid g(x) \leq c\}
+$$
+is convex. Indeed, if $x'$ and $x''$ both satisfy $g(x) \leq c$, then by convexity
+$$
+    g(tx' + (1-t)x'') \leq t g(x') + (1-t) g(x'') \leq tc + (1-t)c = c,
+$$
+so the convex combination remains in the sublevel set.
+
+The converse, however, is false in general: it is possible for a function to have convex sublevel sets without being convex. Therefore, convexity of the function is a stronger property than convexity of one particular feasible region.\\
+
+Several sets that appear naturally in control and optimization are convex.\\
+A \emph{halfspace} is a set of the form
+$$
+    \{x \mid a^\top x \leq b\},
+$$
+where $a \in \mathbb{R}^n$ and $b \in \mathbb{R}$. Geometrically, a halfspace is one side of a hyperplane.\\
+A \emph{ball} centered at $c$ with radius $r$ is a set of the form
+$$
+    \{x \mid \|x-c\| \leq r\}.
+$$
+Because norms are convex, balls are convex sets.\\
+An important class of sets in MPC is given by \emph{polytopes}. These are intersections of finitely many halfspaces:
+$$
+    \{x \mid a_i^\top x \leq b_i,\; i=1,\dots,r\}
+    =
+    \{x \mid Ax \leq b\}.
+$$
+State and input constraints in linear MPC are usually expressed exactly in this form.\\
+It is useful to distinguish between unions and intersections. The intersection of convex sets is always convex, because any line segment that remains in each set separately also remains in their common intersection. In contrast, the union of convex sets is not necessarily convex. Two disjoint intervals on the real line already provide a counterexample. This simple observation is important in practice: adding constraints tends to preserve convexity, while combining alternative feasible regions often destroys it.\\
+
+A key geometric property of convex sets is the existence of supporting hyperplanes. Intuitively, a supporting hyperplane touches the boundary of a convex set without cutting through it.\\
+Suppose a set is described as
+$$
+    X = \{x \mid g(x) \leq 0\},
+$$
+and let $z$ be a boundary point such that $g(z)=0$ and $g$ is differentiable at $z$. Then a local supporting hyperplane is given by
+$$
+    \nabla g(z)^\top (x-z) \leq 0.
+$$
+Equivalently,
+$$
+    \nabla g(z)^\top x \leq \nabla g(z)^\top z.
+$$
+This is the first-order linear approximation of the boundary at the point $z$. The result explains why affine constraints are so natural in optimization: they describe exactly the geometry of tangent or supporting hyperplanes.\\
+The picture becomes more delicate when the boundary has a kink and the gradient is not defined. In that case, one has to replace the gradient by a more general notion such as a subgradient. For the purposes of this handout, the differentiable case is the most relevant one.\\
+
+Several classes of convex functions occur repeatedly in control.\\
+\paragraph{Affine functions.}
+Any function of the form
+$$
+    f(x) = a^\top x + b
+$$
+is convex. In fact, affine functions are both convex and concave.
+
+\paragraph{Norms.}
+Functions of the form
+$$
+    f(x) = \|x-c\|
+$$
+are convex. This explains why norm-based penalties are common in estimation, robust control, and optimization.
+
+\paragraph{Quadratic functions.}
+A quadratic function
+$$
+    f(x) = x^\top A x + b^\top x + c
+$$
+is convex if and only if $A \succeq 0$, that is, if $A$ is positive semidefinite. This is the basic reason why quadratic costs in LQR and MPC lead to convex optimization problems when the constraints are also convex.
+
+\subsection{Derivative-based characterizations of convexity}
+For differentiable and twice differentiable functions, convexity can be tested through derivatives.\\
+If $f$ is differentiable on a convex domain, then $f$ is convex if and only if
+$$
+    f(y) \geq f(x) + \nabla f(x)^\top (y-x)
+    \qquad \forall x,y.
+    \label{eq:first_order_convexity}
+$$
+This means that the tangent hyperplane at any point underestimates the function globally. Equation \eqref{eq:first_order_convexity} is one of the most useful characterizations of convexity, both conceptually and algorithmically.\\
+If $f$ is twice differentiable on a convex domain, then $f$ is convex if and only if
+$$
+    \nabla^2 f(x) \succeq 0
+    \qquad \forall x.
+$$
+Thus, convexity can be checked by testing whether the Hessian is positive semidefinite everywhere.\\
+In one dimension, this reduces to the familiar condition $f''(x) \geq 0$. In several dimensions, the Hessian plays the same role, but now curvature must be nonnegative in every direction.
+
+\subsection{Convex optimization problems}
+We now return to the constrained problem in \eqref{eq:generic_opt_problem}. It is called a \emph{convex optimization problem} if
+\begin{itemize}
+    \item $X$ is a convex set,
+    \item $f$ is convex,
+    \item each inequality constraint function $g_i$ is convex,
+    \item each equality constraint is affine.
+\end{itemize}
+Under these assumptions, the feasible set
+$$
+    X \cap \{x \mid g(x) \leq 0\} \cap \{x \mid h(x)=0\}
+$$
+is convex. The reason the equality constraints must be affine is that a general nonlinear equality constraint would typically define a nonconvex set.\\
+Convex optimization problems are much simpler than general nonlinear programs for a fundamental reason: there are no spurious local minima. This is the main structural property that makes them attractive in real-time control.\\
+
+A point $x^\star$ is a local minimum if there exists $R>0$ such that
+$$
+    f(z) \geq f(x^\star)
+$$
+for all feasible $z$ satisfying $\|z-x^\star\| \leq R$.\\
+For convex problems, local optimality automatically implies global optimality. The proof is short and very instructive. Assume that $x^\star$ is locally optimal but not globally optimal. Then there exists a feasible point $y$ such that
+$$
+    f(y) < f(x^\star).
+$$
+Because the feasible set is convex, every point on the segment
+$$
+    z_t = ty + (1-t)x^\star, \qquad t \in [0,1]
+$$
+is feasible. Choosing $t>0$ small enough, we can place $z_t$ inside the ball of radius $R$ around $x^\star$. By convexity of $f$,
+$$
+    f(z_t) \leq t f(y) + (1-t) f(x^\star) < f(x^\star),
+$$
+which contradicts local optimality. Hence every local minimum is global.\\
+This single fact explains much of the power of convex optimization: once a candidate point is known to be locally optimal, the search is over.
+
+\subsection{First-order optimality conditions}
+
+Suppose the problem is differentiable. Then a feasible point $x^\star$ is locally optimal if and only if
+\begin{equation}
+    \nabla f(x^\star)^\top (y-x^\star) \geq 0
+    \qquad \text{for all feasible } y.
+    \label{eq:fo_opt_cond_feasible}
+\end{equation}
+This condition says that, at an optimum, the gradient cannot point toward any feasible descent direction.\\
+In the unconstrained case, every direction is feasible, so \eqref{eq:fo_opt_cond_feasible} reduces to
+$$
+    \nabla f(x^\star)=0.
+$$
+Thus, unconstrained optimization leads to the familiar linear algebra test of setting the gradient equal to zero.\\
+The constrained case is more interesting. At the optimum, the negative gradient may point outside the feasible set, so it cannot be canceled by free motion of the decision variable. Instead, it must be balanced by the geometry of the active constraints. This leads to the Karush--Kuhn--Tucker conditions.
+
+\subsection{KKT conditions}
+Consider the constrained problem
+$$
+\begin{aligned}
+    \min_{x \in X} \quad & f(x) \\
+    \text{s.t.} \quad & g(x) \leq 0, \\
+                      & h(x) = 0.
+\end{aligned}
+$$
+Under suitable regularity assumptions, a local optimum $x^\star$ satisfies the KKT conditions: there exist multiplier vectors $\mu \in \mathbb{R}^m$ and $\lambda \in \mathbb{R}^p$ such that
+\begin{align}
+    \nabla f(x^\star) + \sum_{i=1}^m \mu_i \nabla g_i(x^\star) + \nabla h(x^\star)^\top \lambda &= 0,
+    \label{eq:kkt_stationarity} \\
+    g_i(x^\star) &\leq 0, \qquad i=1,\dots,m, \label{eq:kkt_primal_feasibility} \\
+    h(x^\star) &= 0, \label{eq:kkt_eq_feasibility} \\
+    \mu_i &\geq 0, \qquad i=1,\dots,m, \label{eq:kkt_dual_feasibility} \\
+    \mu_i g_i(x^\star) &= 0, \qquad i=1,\dots,m. \label{eq:kkt_comp_slackness}
+\end{align}
+Each condition has a clear meaning. Equation \eqref{eq:kkt_stationarity} is the stationarity condition: the gradient of the cost is balanced by a linear combination of the gradients of the active constraints. Conditions \eqref{eq:kkt_primal_feasibility} and \eqref{eq:kkt_eq_feasibility} express primal feasibility. Condition \eqref{eq:kkt_dual_feasibility} says that inequality multipliers must be nonnegative. Finally, \eqref{eq:kkt_comp_slackness} is the complementary slackness condition: if a constraint is inactive, then its multiplier is zero; if its multiplier is positive, then the constraint must be active.\\
+For convex optimization problems, these conditions are especially powerful. Under standard constraint qualifications, they are not only necessary but also sufficient. In other words, solving the KKT system is enough to recover the global optimizer.
+
+\subsection{Lagrangian viewpoint}
+The KKT conditions can be organized through the Lagrangian
+$$
+    \mathcal{L}(x,\mu,\lambda)
+    :=
+    f(x) + \mu^\top g(x) + \lambda^\top h(x).
+$$
+From this viewpoint, constrained optimization can be interpreted as the search for a saddle point of the Lagrangian: one minimizes with respect to the primal variable $x$ and maximizes with respect to the dual variables associated with the inequalities and equalities.\\
+This viewpoint is central in many numerical methods. It is also conceptually useful in control, because dual variables often admit an interpretation as shadow prices, sensitivities, or integral correction signals. This becomes particularly visible in primal--dual algorithms and dual ascent methods.\\
+
+There are two complementary ways to think about convex optimization.\\
+The first is the \emph{algebraic view}. Since the KKT conditions characterize the optimum, one may try to solve a structured system of equations involving the primal variable and the multipliers. In quadratic programming, this often leads to linear algebraic systems with a very specific sparsity pattern.\\
+The second is the \emph{geometric or iterative view}. Since the gradient provides a descent direction and convexity rules out bad local minima, one can use iterative algorithms such as gradient descent, projected gradient descent, dual ascent, or interior-point methods. These algorithms repeatedly apply simple updates until convergence.\\
+
+This is exactly where the earlier observation becomes relevant again: computers are good at linear algebra and iteration. Convex optimization exploits both. The geometry guarantees that the iterates move toward the correct solution, while the algebraic structure makes each update computationally efficient. This is the reason convex programs can often be solved fast enough for online control.
+
+\subsection{Connection with MPC and control}
+
+The relevance of convex optimization for control can now be summarized clearly.\\
+In unconstrained LQR, the optimization problem is quadratic and unconstrained, so the optimum can be computed analytically through the Riccati recursion. In constrained MPC with linear dynamics, quadratic cost, and polyhedral state and input constraints, the online problem is a convex quadratic program. Because the problem is convex, the optimizer is globally meaningful, the value function is well behaved, and the explicit MPC law becomes piecewise affine when it is computed offline.\\
+More generally, many feedback-optimization schemes rely on repeatedly solving simple convex subproblems. Projection steps, local quadratic approximations, and primal--dual iterations are all practical only because the underlying subproblems preserve convexity.
