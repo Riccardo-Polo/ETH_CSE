@@ -1,0 +1,456 @@
+\section{Introduction to Linear Quadratic Optimal Control}
+
+The next step toward model predictive control is to study optimal control problems in a setting where the model is \textbf{linear}, the objective is \textbf{quadratic}, and \textbf{no inequality constraints} are present. Although such problems are \textbf{much simpler} than full MPC formulations, they already contain many of the central ideas of predictive control: one optimizes over a finite or infinite horizon, one trades off state regulation against control effort through a cost function, and one exploits the model to predict future trajectories. In addition, this class of problems admits explicit structure and elegant solution methods, which makes it an ideal starting point.\\
+
+In discrete-time optimal control, the goal is to choose an input sequence
+\[
+U := [u_0^\top,u_1^\top,\dots]^\top
+\]
+so as to minimize a performance criterion starting from a given initial state $x(0)$. In the finite-horizon case, a common objective is a sum of stage costs plus a terminal penalty,
+\[
+J(x_0,U) := \ell(x_N) + \sum_{i=0}^{N-1} \ell(x_i,u_i),
+\]
+subject to the system dynamics
+\[
+x_{i+1}=g(x_i,u_i), \qquad i=0,\dots,N-1,
+\]
+the initial condition
+\[
+x_0=x(0),
+\]
+and, in the most general setting, also input, state, and terminal constraints. In this chapter, however, we focus on the unconstrained linear quadratic case, which already reveals the main structure of optimal regulation and will later serve as a key building block in MPC.
+
+\subsection{Finite-horizon linear quadratic regulation}
+
+We consider the discrete-time \textbf{linear time-invariant} system
+\[
+x(k+1)=Ax(k)+Bu(k),
+\]
+and we seek to \textbf{regulate the state to the origin} by minimizing the quadratic cost
+\[
+J^\star(x(0)) := \min_U \; x_N^\top P x_N + \sum_{i=0}^{N-1}\bigl(x_i^\top Q x_i + u_i^\top R u_i\bigr),
+\]
+subject to
+\[
+x_{i+1}=Ax_i+Bu_i, \qquad i=0,\dots,N-1,
+\]
+and
+\[
+x_0=x(0).
+\]
+Here $P\succeq 0$ is the terminal weight, $Q\succeq 0$ is the state weight, $R\succ 0$ is the input weight, and $N$ is the horizon length. The matrices $Q$ and $R$ determine how strongly one penalizes state deviations and control effort, while the matrix $P$ determines how the final state at the end of the horizon is valued. Because the problem is unconstrained and the objective is quadratic, one expects a solution with a particularly \textbf{simple structure}. \\
+The interpretation of the cost is straightforward but important. The state term penalizes deviations from the origin, while the input term penalizes aggressive control action. The controller therefore balances performance against effort. A large $Q$ relative to $R$ encourages fast regulation at the price of stronger control inputs, whereas a large $R$ makes the controller more conservative. This trade-off is one of the reasons why quadratic optimal control is both practical and conceptually appealing.
+
+\section{Batch Approach}
+
+A first way to solve the finite-horizon problem is to \textbf{eliminate the state variables} and express the entire optimization problem directly in terms of the initial state and the input sequence. This is called the batch approach. The key observation is that repeated substitution of the system dynamics allows all future states to be written explicitly as linear functions of $x(0)$ and the decision variables $u_0,\dots,u_{N-1}$.\\
+Starting from $x_0=x(0)$, one obtains
+\[
+x_1 = Ax(0)+Bu_0,
+\]
+\[
+x_2 = A^2x(0)+ABu_0+Bu_1,
+\]
+and, continuing in this way, all states up to $x_N$. Collecting them into the stacked vector
+\[
+X := [x_0^\top,x_1^\top,\dots,x_N^\top]^\top,
+\]
+and the inputs into
+\[
+U := [u_0^\top,u_1^\top,\dots,u_{N-1}^\top]^\top,
+\]
+one may write
+\[
+X = S_x x(0) + S_u U,
+\]
+where
+$$S_x = \begin{bmatrix}
+    I \\ A \\ A^2 \\ \vdots \\ A^N
+\end{bmatrix} \qquad S_u = \begin{bmatrix}
+    0 & 0 & \cdots & 0 \\
+    B & 0 & \cdots & 0 \\
+    AB & B & \cdots & 0 \\
+    \vdots & \vdots & \ddots & \vdots \\
+    A^{N-1}B & \cdots & AB & B
+\end{bmatrix}$$
+To rewrite the cost compactly, define the block-diagonal matrices
+\[
+\bar{Q} := \operatorname{blockdiag}(Q,\dots,Q,P),
+\qquad
+\bar{R} := \operatorname{blockdiag}(R,\dots,R).
+\]
+Then the cost becomes
+\[
+J(x(0),U)=X^\top \bar{Q}X + U^\top \bar{R}U.
+\]
+Substituting the expression for $X$ yields
+\[
+J(x(0),U)
+=
+\bigl(S_xx(0)+S_uU\bigr)^\top \bar{Q}\bigl(S_xx(0)+S_uU\bigr)+U^\top \bar{R}U.
+\]
+After expansion, this can be written as
+\begin{align*}
+J(x(0),U) &= x(0)^\top S_x^\top \bar{Q} S_x x(0) + 2x(0)^\top \textcolor{red}{S_x^\top \bar{Q} S_u} U +\textcolor{blue}{U^\top S_u^\top \bar{Q} S_u U}+ \textcolor{blue}{U^\top \bar{R}U}\\
+&=U^\top \textcolor{blue}{H} U + 2x(0)^\top \textcolor{red}{F} U + x(0)^\top S_x^\top \bar{Q} S_x x(0)
+\end{align*}
+where
+\[
+H := S_u^\top \bar{Q} S_u + \bar{R},
+\qquad
+F := S_x^\top \bar{Q} S_u.
+\]
+Since $\bar{R}\succ 0$ and $S_u^\top \bar{Q}S_u \succeq 0$, it follows that $H\succ 0$. Therefore the cost is a strictly convex quadratic function of $U$, and hence admits a unique minimizer.\\
+The optimal input sequence is obtained by differentiating with respect to $U$ and setting the gradient to zero:
+\[
+\nabla_U J(x(0),U)=2HU+2F^\top x(0)=0.
+\]
+Hence
+\[
+U^\star(x(0)) = -H^{-1}F^\top x(0).
+\]
+So the optimal sequence is a linear function of the initial state. Substituting this optimizer back into the cost shows that the \textbf{optimal value is itself a quadratic function of the initial state}:
+\[
+J^\star(x(0))
+=
+x(0)^\top
+\Bigl(
+S_x^\top \bar{Q} S_x
+-
+S_x^\top \bar{Q}S_u
+(S_u^\top \bar{Q}S_u+\bar{R})^{-1}
+S_u^\top \bar{Q}S_x
+\Bigr)
+x(0).
+\]
+This is an important structural result: in linear quadratic optimal control, not only the optimal input, but also the optimal cost-to-go, has a quadratic dependence on the state.
+
+\begin{theorembox}[Batch solution]
+In the unconstrained finite-horizon LQ problem, all predicted states can be eliminated in favor of the input sequence, and the resulting optimization becomes a strictly convex quadratic minimization in the stacked input vector $U$. Its unique solution is linear in the initial state.
+\end{theorembox}
+
+The batch method is conceptually direct and easy to derive. However, it returns a numerical sequence of future inputs tailored to the specific initial condition. It does not directly provide a state-feedback law to be used later if the trajectory deviates from the nominal prediction. This limitation motivates a second viewpoint, based on dynamic programming. Plus, if there are state or input constraints, solving this problem by matrix inversion is not guaranteed to result in a feasible solution.
+
+\section{Recursive Approach and Dynamic Programming}
+
+Instead of solving for the entire input sequence at once, one may exploit the recursive structure of the problem. The central idea is to describe the optimal cost from a given time onward as a function of the current state. This leads naturally to dynamic programming and to Bellman’s principle of optimality.
+
+\subsection{Cost-to-go and one-step optimization}
+
+For a time index $j$, define the $j$-step \textbf{optimal cost-to-go} as
+\[
+J_j^\star(x(j))
+:=
+\min_{U_{j\to N}}
+x_N^\top P x_N
++
+\sum_{i=j}^{N-1}
+\bigl(x_i^\top Qx_i + u_i^\top Ru_i\bigr),
+\]
+subject to the dynamics from time $j$ onward and the initial condition $x_j=x(j)$. This is the minimum cost achievable over the remaining portion of the horizon starting from the state at time $j$.\\
+
+At the last stage, namely $j=N-1$, the problem reduces to a one-step optimization:
+\[
+J_{N-1}^\star(x_{N-1})
+=
+\min_{u_{N-1}}
+\Bigl(
+x_{N-1}^\top Qx_{N-1}
++
+u_{N-1}^\top Ru_{N-1}
++
+x_N^\top P_N x_N
+\Bigr),
+\]
+with
+\[
+x_N=Ax_{N-1}+Bu_{N-1},
+\qquad
+P_N=P.
+\]
+Substituting the dynamics into the cost yields a quadratic expression in $u_{N-1}$:
+\begin{align*}
+J_{N-1}^\star(x_{N-1}) &= \min_{u_{N-1}} \Bigl(x_{N-1}^\top Qx_{N-1}
++
+u_{N-1}^\top Ru_{N-1}
++(Ax_{N-1}+Bu_{N-1})^\top P_N (Ax_{N-1}+Bu_{N-1})\Bigr)\\
+&=\min_{u_{N-1}} \Bigl(x_{N-1}^\top (Q + A^\top P_N A) x_{N-1} + u_{N-1}^\top (R + B^\top P_N B) u_{N-1} + 2x_{N-1}^\top A^\top P_N B u_{N-1}\Bigr)
+\end{align*}
+Setting its gradient to zero leads to the optimal terminal-step control law
+$$ 2 (B^\top P_N B + R) u_{N-1} + 2 B^\top P_N A x_{N-1} = 0$$
+\begin{align*}
+u_{N-1}^\star
+&=
+-(B^\top P_N B + R)^{-1}B^\top P_N A x_{N-1}\\
+&=: F_{N-1}x_{N-1}.
+\end{align*}
+The corresponding optimal cost-to-go turns out to be quadratic:
+\[
+J_{N-1}^\star(x_{N-1})=x_{N-1}^\top P_{N-1}x_{N-1},
+\]
+where
+\[
+P_{N-1}
+=
+A^\top P_N A + Q
+-
+A^\top P_N B(B^\top P_N B + R)^{-1}B^\top P_N A.
+\]
+This already reveals the characteristic structure of the recursive solution: the \textbf{optimal control law is linear in the state, and the optimal cost-to-go is quadratic}.
+
+\subsection{Bellman’s principle of optimality}
+
+Now consider the problem one step earlier. The optimal two-step cost from time $N-2$ can be written as
+\[
+J_{N-2}^\star(x_{N-2})
+=
+\min_{u_{N-2}}
+\Bigl(
+x_{N-2}^\top Qx_{N-2}
++
+u_{N-2}^\top Ru_{N-2}
++
+J_{N-1}^\star(x_{N-1})
+\Bigr),
+\]
+subject to
+\[
+x_{N-1}=Ax_{N-2}+Bu_{N-2}.
+\]
+The reason this is valid is \textbf{Bellman’s principle of optimality}: any tail of an optimal trajectory must itself be optimal for the subproblem starting at that later point. In other words, if a policy is optimal over the full horizon, then after any intermediate time the remaining decisions must solve the corresponding shorter-horizon optimal control problem.\\
+
+This principle gives the recursion
+\[
+J_i^\star(x_i)
+=
+\min_{u_i}
+\Bigl(
+x_i^\top Qx_i + u_i^\top Ru_i + J_{i+1}^\star(x_{i+1})
+\Bigr),
+\qquad
+x_{i+1}=Ax_i+Bu_i,
+\]
+for all $i=0,\dots,N-1$. \textbf{Assuming} that
+\[
+J_{i+1}^\star(x_{i+1})=x_{i+1}^\top P_{i+1}x_{i+1},
+\]
+one again obtains by substitution and differentiation the optimal policy
+\[
+u_i^\star
+=
+-(B^\top P_{i+1}B + R)^{-1}B^\top P_{i+1}Ax_i
+=:F_i x_i,
+\]
+and the recursion
+\[
+P_i
+=
+A^\top P_{i+1}A + Q
+-
+A^\top P_{i+1}B(B^\top P_{i+1}B + R)^{-1}B^\top P_{i+1}A.
+\]
+This backward recursion, initialized with $P_N=P$, is called the \textbf{discrete-time Riccati equation}, or Riccati difference equation. It yields all feedback gains $F_i$ and all cost matrices $P_i$ over the horizon. In particular,
+\[
+J^\star(x(0)) = J_0^\star(x(0)) = x(0)^\top P_0 x(0).
+\]
+Thus the recursive method computes a \textbf{family of feedback laws, one for each stage}, rather than only a single open-loop sequence.
+
+\begin{theorembox}[Riccati recursion]
+For the finite-horizon unconstrained LQ problem, the optimal cost-to-go has the quadratic form
+\[
+J_i^\star(x_i)=x_i^\top P_i x_i,
+\]
+and the optimal control law has the linear state-feedback form
+\[
+u_i^\star = F_i x_i,
+\]
+where the matrices $P_i$ are computed backward through the Riccati difference equation.
+\end{theorembox}
+
+\subsection{Comparison of batch and recursive viewpoints}
+
+The batch and recursive approaches solve the same unconstrained problem, but they do so from different perspectives. The batch method returns the optimal input sequence as a stacked vector of numerical values depending on the initial state. The recursive method returns feedback laws depending on the state at each stage. If the system evolves exactly as predicted, then both methods generate the same control actions along the nominal trajectory.\\
+
+The recursive viewpoint has two major conceptual advantages. First, it exposes the feedback structure of the solution. If disturbances or model mismatch cause the actual state to deviate from the nominal prediction, the control decision can still be recomputed optimally from the current state using the feedback law. Second, it is computationally more attractive in many settings, because it breaks the large horizon problem into a backward sequence of smaller problems. The batch Hessian grows with the horizon length, while the recursive method exploits the problem structure much more efficiently. On the other hand, once constraints are added, the batch formulation is usually much easier to generalize, which is one reason why MPC is commonly formulated as a finite-horizon constrained optimization over a stacked input sequence.
+
+\section{Receding Horizon Interpretation}
+
+The unconstrained finite-horizon LQ problem also provides a simple instance of receding horizon control. One solves the finite-horizon optimization problem, extracts the first control input from the optimal sequence, applies it to the system, and then repeats the entire procedure at the next sampling instant. This is exactly the same logic that later defines MPC in the constrained case.\\
+
+For an unconstrained linear quadratic problem, applying this receding-horizon strategy yields a \textbf{linear state-feedback controller}. Still, the interpretation is important: the \textbf{controller is not derived first and optimized later}; instead, it emerges from the repeated solution of a finite-horizon optimal control problem. This viewpoint generalizes naturally to more complex models and to constrained problems, where no closed-form feedback law is available.
+
+\section{Infinite-Horizon LQR}
+
+In many situations, the natural control objective is not limited to a finite planning window, but extends indefinitely into the future. This leads to the infinite-horizon linear quadratic regulator problem
+\[
+J_\infty(x(0))
+=
+\min_{u(\cdot)}
+\sum_{i=0}^{\infty}
+\bigl(x_i^\top Qx_i + u_i^\top Ru_i\bigr),
+\]
+subject to
+\[
+x_{i+1}=Ax_i+Bu_i, \qquad i=0,1,2,\dots,
+\]
+and
+\[
+x_0=x(0).
+\]
+The infinite horizon removes the arbitrariness of a chosen terminal time and leads to a \textbf{time-invariant optimal feedback law}.
+
+\subsection{Algebraic Riccati equation}
+
+By analogy with the finite-horizon recursive solution, one expects the infinite-horizon optimal cost-to-go to have the quadratic form
+\[
+J_\infty^\star(x)=x^\top P_\infty x,
+\]
+and the corresponding optimal control law to be
+\[
+u^\star(k)
+=
+-(B^\top P_\infty B + R)^{-1}B^\top P_\infty A x(k)
+=:F_\infty x(k).
+\]
+If the finite-horizon Riccati difference equation converges as the horizon tends to infinity, then the limiting matrix $P_\infty$ must satisfy the fixed-point equation
+\[
+P_\infty
+=
+A^\top P_\infty A + Q
+-
+A^\top P_\infty B(B^\top P_\infty B + R)^{-1}B^\top P_\infty A.
+\]
+This is the \textbf{discrete-time algebraic Riccati equation}. Its solution yields the asymptotic LQR feedback gain $F_\infty$.\\
+Under standard assumptions, namely stabilizability of $(A,B)$ and observability of $(Q^{1/2},A)$, the Riccati recursion converges to the unique positive definite solution $P_\infty$ of the algebraic Riccati equation. This gives a well-defined infinite-horizon optimal controller. The corresponding \textbf{feedback} is \textbf{time-invariant}, in contrast with the finite-horizon case where the gains $F_i$ vary with the remaining length of the horizon. 
+\subsection{Stability of infinite-horizon LQR}
+
+An important advantage of the infinite-horizon LQR is that, under suitable assumptions, the resulting closed-loop system is asymptotically stable. More precisely, if $(A,B)$ is stabilizable and $Q,R \succ 0$, then the optimal infinite-horizon feedback law
+\[
+u(k)=F_\infty x(k),
+\qquad
+F_\infty = -(R+B^\top P_\infty B)^{-1}B^\top P_\infty A,
+\]
+renders the closed-loop system
+\[
+x(k+1)=(A+BF_\infty)x(k)
+\]
+asymptotically stable. The proof is based on the observation that the optimal value function of the infinite-horizon problem is a Lyapunov function for the closed-loop system.
+
+\begin{theorembox}[Lyapunov function for infinite-horizon LQR]
+If $(A,B)$ is stabilizable and $Q,R \succ 0$, then the optimal value function
+\[
+J^\star(x)=x^\top P_\infty x
+\]
+is a Lyapunov function for the closed-loop system
+\[
+x^+=(A+BF_\infty)x,
+\]
+where
+\[
+F_\infty = -(R+B^\top P_\infty B)^{-1}B^\top P_\infty A,
+\]
+and $P_\infty \succ 0$ is the solution of the algebraic Riccati equation.
+\end{theorembox}
+
+The first two Lyapunov properties follow immediately from $P_\infty \succ 0$. Indeed,
+\[
+J^\star(0)=0,
+\qquad
+J^\star(x)=x^\top P_\infty x>0 \quad \forall x\neq 0,
+\]
+and, since $P_\infty$ is positive definite,
+\[
+\|x\|\to\infty \quad \Longrightarrow \quad J^\star(x)=x^\top P_\infty x \to \infty.
+\]
+It therefore remains to show that $J^\star$ decreases strictly along closed-loop trajectories.\\    
+To do so, observe that the optimal infinite-horizon cost starting at time $k$ can be written as
+\[
+J^\star(x(k))
+=
+x(k)^\top P_\infty x(k)
+=
+\sum_{i=k}^{\infty} x(i)^\top \bigl(Q+F_\infty^\top R F_\infty\bigr)x(i),
+\]
+because along the optimal closed-loop trajectory one has
+\[
+u(i)=F_\infty x(i).
+\]
+Now consider the value of the same function one step later:
+\[
+J^\star(x(k+1))
+=
+J^\star\bigl((A+BF_\infty)x(k)\bigr)
+=
+\sum_{i=k+1}^{\infty} x(i)^\top \bigl(Q+F_\infty^\top R F_\infty\bigr)x(i).
+\]
+Comparing the two expressions gives
+\[
+J^\star(x(k+1))
+=
+J^\star(x(k))
+-
+x(k)^\top \bigl(Q+F_\infty^\top R F_\infty\bigr)x(k).
+\]
+Since $Q\succ 0$ and $R\succ 0$, the matrix
+\[
+Q+F_\infty^\top R F_\infty
+\]
+is positive definite, and therefore
+\[
+x(k)^\top \bigl(Q+F_\infty^\top R F_\infty\bigr)x(k)>0
+\qquad \forall x(k)\neq 0.
+\]
+Hence
+\[
+J^\star(x(k+1))<J^\star(x(k))
+\qquad \forall x(k)\neq 0.
+\]
+Thus the optimal value function decreases strictly along every nontrivial closed-loop trajectory, and is therefore a Lyapunov function for the system
+\[
+x(k+1)=(A+BF_\infty)x(k).
+\]
+This proves that the origin is asymptotically stable. In particular,
+\[
+\lim_{k\to\infty} x(k)=0.
+\]
+The result is conceptually important: the same function that measures the optimal infinite-horizon performance also certifies stability of the optimal closed loop.\\
+The argument above used the stronger assumption $Q\succ 0$. This condition can be relaxed. In particular, the infinite-horizon LQR remains stabilizing under the weaker assumptions
+\[
+Q\succeq 0,
+\qquad
+R\succ 0,
+\]
+provided that $(A,B)$ is stabilizable and $(Q^{1/2},A)$ is detectable. Thus detectability plays here the same role that observability played in the stronger result: it is sufficient to ensure that no unstable mode can remain invisible to the cost.
+\section{Terminal Weight and Quasi-Infinite-Horizon Thinking}
+
+Since MPC is usually implemented with a finite prediction horizon, one naturally asks how to choose the terminal weight $P$ so that the finite-horizon problem approximates the infinite-horizon behavior as well as possible. There are several important possibilities.\\
+
+A particularly natural choice is to set the terminal weight equal to the infinite-horizon cost-to-go beyond the horizon. In other words, one chooses
+\[
+P=P_\infty,
+\]
+where $P_\infty$ solves the algebraic Riccati equation. Then the finite-horizon problem exactly matches the infinite-horizon solution from the terminal point onward. This is the cleanest way of embedding the tail of the infinite-horizon problem into a finite-horizon formulation.\\
+
+A second possibility is to assume that no control action is applied after the end of the horizon, so that for $k\geq N$ the state evolves autonomously according to
+\[
+x(k+1)=Ax(k).
+\]
+In that case, the appropriate terminal weight is obtained from the Lyapunov equation
+\[
+A^\top P A + Q = P.
+\]
+This choice only makes sense if the autonomous system is asymptotically stable, because otherwise no positive definite solution exists.\\
+
+A third option is to impose that both the state and the input vanish after the horizon. In this case one does not only use a terminal penalty, but rather imposes a terminal constraint such as
+\[
+x_N=0.
+\]
+This viewpoint is important for later constrained MPC theory, where terminal costs and terminal sets are used precisely to mimic infinite-horizon behavior and recover stability guarantees from a finite optimization horizon.
+
+\section{Summary}
+
+Unconstrained linear quadratic optimal control is the simplest predictive-control setting in which all central ingredients of MPC already appear. One starts from a model, predicts future trajectories over a horizon, and chooses the control sequence that minimizes a quadratic objective balancing state regulation and control effort. In the finite-horizon case, the problem can be solved either in batch form, by eliminating the states and minimizing a quadratic function of the full input sequence, or recursively, through dynamic programming and the Riccati difference equation.\\
+
+The recursive viewpoint is especially important because it reveals the feedback structure of the solution and leads directly to Bellman’s principle of optimality. It also clarifies the meaning of receding-horizon control: at each step, one solves a finite-horizon problem, applies the first input, and repeats the optimization at the next sampling instant. The quality of this strategy depends strongly on the horizon length and on the terminal ingredients used.\\
+
+Passing to the infinite-horizon problem yields the time-invariant LQR feedback law, determined by the algebraic Riccati equation. Under standard stabilizability and detectability assumptions, the infinite-horizon optimal value function is quadratic and also serves as a Lyapunov function, thereby proving stability of the optimal closed loop. This connection between optimization, value functions, and Lyapunov stability will be one of the central themes throughout the rest of MPC theory.
