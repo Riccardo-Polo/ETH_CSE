@@ -34,7 +34,14 @@
 \fancyhf{}
 \fancyhead[L]{Model Predictive Control}
 \fancyhead[R]{Lecture Handout}
-\fancyfoot[C]{\thepage\ / \pageref{LastPage}}
+\fancyfoot[L]{\nouppercase{\leftmark}}
+\fancyfoot[R]{\thepage\ / \pageref{LastPage}}
+
+\renewcommand{\sectionmark}[1]{\markboth{#1}{}}
+
+\renewcommand{\headrulewidth}{0.4pt} % line in header
+\renewcommand{\footrulewidth}{0.4pt} % line in footer
+
 
 \titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
