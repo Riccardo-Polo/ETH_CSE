@@ -1,4 +1,5 @@
-\subsection{Optimal steady-state regulation}
+\subsection{Problem setting and architecture}
+\subsubsection{Optimal steady-state regulation}
 
 In many automation problems, the control objective is not only to stabilize the plant, but to drive it toward an \emph{optimal operating point}. This operating point is typically characterized by steady-state specifications rather than by transient performance requirements.\\
 
@@ -34,7 +35,7 @@ Therefore, the two approaches differ in what is being optimized:
 
 This distinction is especially relevant when the dynamic model is inaccurate but the steady-state behavior is sufficiently known. In that case, feedback optimization remains meaningful, while Economic MPC may be difficult to formulate reliably.
 
-\subsection{Fast-stable plant}
+\subsubsection{Fast-stable plant}
 
 We now introduce the basic setting for feedback optimization in the case of a \emph{fast and stable} plant. The idea is that the plant dynamics are sufficiently fast, and already stable, so that from the viewpoint of the upper optimization layer the dominant object is the steady-state input--output relation.\\
 
@@ -88,7 +89,7 @@ y = Hu + Lw,
 \]
 which is the object that will be used in the feedback optimization layer.
 
-\subsection{``Certainty-equivalence'' design}
+\subsubsection{``Certainty-equivalence'' design}
 
 Given the steady-state map
 \[
@@ -148,7 +149,7 @@ A natural question then arises: \emph{how can we design feedback controllers tha
 \end{itemize}
 Rather than solving the steady-state optimization problem once and applying the resulting input in open loop, we construct a controller that updates the input iteratively on the basis of measured plant outputs. In this way, the optimization algorithm and the physical plant become interconnected and the optimizer is embedded into the feedback loop. The resulting closed-loop system should drive the plant toward a steady state that satisfies the constraints and is optimal for the \emph{actual} plant, not only for the nominal model.
 
-\subsection{Interconnecting plant and algorithms}
+\subsubsection{Interconnecting plant and algorithms}
 
 This viewpoint can be understood by comparing two different implementations.
 
@@ -186,7 +187,7 @@ In summary, the transition is the following:
 
 This interconnection is what allows one to move beyond certainty-equivalence design and obtain an autonomous closed-loop behavior with improved robustness to uncertainty in $w$ and in the steady-state map $h$.\\
 
-\subsection{Online feedback optimization}
+\subsubsection{Online feedback optimization}
 
 The previous discussion motivates a shift from static feedforward optimization to \emph{online feedback optimization}. The idea is to implement an optimization algorithm as a dynamical system interacting directly with the plant, so that the plant measurements continuously correct the optimization process. In this way, the input is not computed once and for all from an uncertain model, but is updated online on the basis of the actual closed-loop behavior.\\
 
@@ -216,7 +217,8 @@ Once the problem has been written in this form, many classical iterative methods
 \end{itemize}
 The reason these methods are attractive is that they admit iterative implementations that can naturally be interconnected with the plant. Instead of solving the optimization problem to completion at each step, one performs repeated correction steps, and the plant output provides the information needed to drive the iterations toward the desired optimum.
 
-\subsection{First-order optimization algorithms}
+\subsection{First-order methods for feedback optimization}
+\subsubsection{First-order optimization algorithms}
 
 Let us now look more closely at the class of first-order methods. Consider again the constrained steady-state problem
 \[
@@ -238,7 +240,7 @@ This equivalent formulation is useful because it shows that the optimization var
 
 At this point, the problem has the structure of a nonlinear constrained optimization problem, and one may attack it with standard first-order techniques. The main issue is how to handle the constraints. A first possibility is to absorb the output constraint into the cost by adding a suitable extra term. This leads to gradient methods with \emph{penalty} or \emph{barrier} functions.
 
-\subsection{Gradient descent with penalty / barrier}
+\subsubsection{Gradient descent with penalty / barrier}
 
 Consider the constrained problem
 \[
@@ -295,7 +297,7 @@ The two approaches reflect two different ways of dealing with constraints:
 
 These ideas are particularly useful in feedback optimization because they turn constrained optimization into a form that can be handled by simple first-order iterative laws. The optimization algorithm then updates the input $u$ by descending along the modified objective, while the plant provides the output $y$ entering the cost and the constraint-handling terms.
 
-\subsection{Unconstrained gradient descent}
+\subsubsection{Unconstrained gradient descent}
 
 Before applying gradient methods to the feedback optimization problem, it is useful to recall the basic convergence property of gradient descent in the unconstrained case. Consider the problem
 \[
@@ -375,7 +377,7 @@ So the sequence $\phi(x_k)$ is decreasing along the iterations until the gradien
 \]
 Under suitable additional assumptions, this implies convergence to a local minimum.
 
-\subsection{Gradient descent with penalty}
+\subsubsection{Gradient descent with penalty}
 
 We now apply this idea to the steady-state optimization problem in the presence of output constraints handled through a penalty term. Starting from
 \[
@@ -485,7 +487,7 @@ Thus, the Jacobian $\nabla_u h(u;w)$ is exactly the information needed to connec
 
 The key point is that the controller does not require a full dynamic model of the plant. It only needs a model, estimate, or approximation of the steady-state sensitivities. This is much weaker than full model-based control and is one of the main reasons why feedback optimization is attractive in applications where the transient dynamics are uncertain but the steady-state behavior is sufficiently structured.
 
-\subsection{Projected gradient descent}
+\subsubsection{Projected gradient descent}
 
 Penalty and barrier methods handle the output constraint indirectly by modifying the objective function. A different possibility is to enforce the constraints explicitly through projection. Starting from
 \[
@@ -607,7 +609,7 @@ In summary:
     \item this approximation makes projection computationally tractable and connects projected methods again to the steady-state sensitivity matrix $\nabla_u h(u;w)$.
 \end{itemize}
 
-\subsection{Projected gradient flow via repeated quadratic programming}
+\subsubsection{Projected gradient flow via repeated quadratic programming}
 
 The discussion above suggests a practical refinement of projected gradient descent. The exact projection onto
 \[
@@ -698,7 +700,8 @@ In summary, the repeated-QP construction provides a tractable approximation of p
 
 So the overall controller can be interpreted as a feedback optimization algorithm that repeatedly solves a local QP in order to generate a descent direction compatible with both input and output constraints.
 
-\subsection{Dual problem}
+\subsection{Duality-based methods}
+\subsubsection{Dual problem}
 
 Another important family of first-order methods for constrained optimization is based on \emph{duality}. The idea is to keep the constraints explicitly, but to move them into the objective through Lagrange multipliers. This leads naturally to primal--dual algorithms and dual ascent methods, which are particularly well suited to feedback optimization.
 
@@ -750,7 +753,7 @@ So maximizing over the nonnegative multipliers has the effect of enforcing the c
 
 This viewpoint is particularly useful in feedback optimization, because it leads to algorithms in which the primal variable performs a descent step, while the multiplier performs an ascent step. The multiplier then acts as an internal controller state that stores how strongly the output constraints are being violated.
 
-\subsection{Primal--dual iterations}
+\subsubsection{Primal--dual iterations}
 
 The dual reformulation suggests natural iterative schemes for solving constrained optimization problems. Consider again the saddle-point problem
 \[
@@ -788,7 +791,7 @@ because the Lagrangian is affine in the multiplier:
 \]
 So the dual update is simply driven by the constraint violation. If the constraint is satisfied with margin, the multiplier tends not to grow; if the constraint is violated, the corresponding component of $\lambda$ increases. This is exactly the mechanism by which the multiplier enforces feasibility.
 
-\subsection{Dual ascent for feedback optimization}
+\subsubsection{Dual ascent for feedback optimization}
 
 We now specialize the primal--dual idea to the steady-state optimization problem of feedback optimization. Suppose that the output constraint set can be written as
 \[
@@ -882,7 +885,7 @@ So the primal--dual controller has a clear structure:
 
 This makes dual ascent and primal--dual iterations a very natural tool for online feedback optimization with constrained steady-state outputs.
 
-\subsection{An old friend: dual ascent and PI control}
+\subsubsection{An old friend: dual ascent and PI control}
 
 The primal--dual viewpoint is not only a mathematical construction. In an important special case, it recovers a very classical feedback controller.
 
@@ -983,7 +986,8 @@ In this sense, the multiplier is indeed an ``old friend'': it is nothing but an 
     \label{fig:dual-ascent-pi}
 \end{figure}
 
-\subsection{Design guidelines and tradeoffs}
+\subsection{Design insights}
+\subsubsection{Design guidelines and tradeoffs}
 
 We can now summarize the main design options discussed so far for online feedback optimization. The three classes of methods considered in this chapter are:
 \begin{itemize}
@@ -1050,7 +1054,7 @@ In all cases, the same general message remains valid: feedback optimization does
 which together make it possible to embed optimization algorithms directly into the feedback loop.
 
 \subsection{Extremum seeking}
-
+\subsubsection{Extremum seeking}
 So far, all feedback-optimization schemes relied on at least some approximate knowledge of the steady-state sensitivities
 \[
 \nabla_u h(u;w),
@@ -1080,7 +1084,7 @@ y\notin\mathcal Y.
 \]
 This reinforces the idea that feedback optimization is structurally tied to feasibility. Extremum seeking, on the other hand, addresses a different issue: not the lack of feasibility mechanisms, but the lack of gradient information.
 
-\subsection{Extremum-seeking architecture}
+\subsubsection{Extremum-seeking architecture}
 
 The simplest extremum-seeking idea can be explained for a scalar input. Suppose that the plant is fast and stable, and that the measured steady-state performance is $J(u)$. We want to optimize $J(u)$ without knowing its gradient.
 
@@ -1119,7 +1123,7 @@ is chosen so that, after averaging, the product isolates the first-order term of
 
 So the overall architecture can be interpreted as a feedback mechanism that reconstructs a gradient estimate from input--output oscillations, without ever requiring an explicit model of the plant or of the performance map.
 
-\subsection{Why extremum seeking behaves like gradient descent}
+\subsubsection{Why extremum seeking behaves like gradient descent}
 
 The basic mechanism can be understood with a first-order Taylor expansion. Starting from
 \[
@@ -1179,7 +1183,7 @@ So, at an intuitive level, extremum seeking is nothing but gradient descent in d
 
 Of course, this derivation is only a sketch. A rigorous analysis requires averaging arguments, time-scale separation, and assumptions on the filters and on the plant dynamics. But the basic idea is exactly the one above: extremum seeking creates its own gradient information through oscillatory probing.
 
-\subsection{Applications of extremum seeking}
+\subsubsection{Applications of extremum seeking}
 
 Extremum seeking is especially attractive in applications with the following features:
 \begin{itemize}

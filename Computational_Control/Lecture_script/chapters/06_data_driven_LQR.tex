@@ -1,0 +1,1433 @@
+In this chapter we study the \textbf{infinite-horizon linear quadratic regulator} from a data-driven
+viewpoint. The starting point is the standard stochastic LQR problem for the discrete-time
+linear system
+\[
+x_{t+1} = A x_t + B u_t,
+\qquad x_0 \sim \mathcal D,
+\]
+where the objective is to minimize the expected infinite-horizon quadratic cost
+\[
+\min_{\{u_t\}} \;
+\mathbb E\!\left[\sum_{t=0}^{\infty}
+\left(x_t^\top Q x_t + u_t^\top R u_t\right)\right].
+\]
+Throughout, we assume
+\[
+Q \succeq 0,
+\qquad R \succ 0,
+\]
+and we require the standard structural assumptions
+\[
+(A,B)\ \text{stabilizable},
+\qquad
+(Q^{1/2},A)\ \text{detectable}.
+\]
+Under these assumptions, the infinite-horizon LQR problem is well posed and admits an
+\textbf{optimal stationary policy} of the form
+\[
+u_t = K^\star x_t,
+\]
+that is, the optimal controller is a linear state-feedback law.\\
+
+When the matrices $A$ and $B$ are known, the optimal gain $K^\star$ can be computed in
+different but equivalent ways. A first route is dynamic programming, which leads to the
+Riccati recursion and, in the infinite-horizon limit, to the algebraic Riccati equation.
+A second route is therefore to solve directly the algebraic Riccati equation and recover the
+optimal gain from its stabilizing solution. A third route is based on a \textbf{semidefinite programming
+reformulation}. These viewpoints are equivalent at the model-based level, but they suggest
+different ways of reformulating the problem when the model is not available exactly and one
+would like to reason directly from data.
+
+\subsection{LQR parameterization}
+
+A useful perspective for data-driven control is to parameterize the LQR problem directly in
+terms of the feedback matrix $K$. Instead of optimizing over arbitrary input sequences, we
+restrict attention to linear state-feedback policies
+\[
+u_t = K x_t,
+\]
+and \textbf{optimize over all stabilizing gains} $K$.\\
+To make the dependence on $K$ explicit, let us assume for simplicity that the initial condition
+satisfies
+\[
+\mathbb E[x_0 x_0^\top] = I.
+\]
+If the feedback law $u_t = Kx_t$ is applied, then the closed-loop system becomes
+\[
+x_{t+1} = (A+BK)x_t.
+\]
+For a stabilizing gain $K$, it is natural to introduce the infinite-horizon state covariance
+\[
+P \;=\; \mathbb E\!\left[\sum_{t=0}^{\infty} x_t x_t^\top\right].
+\]
+This matrix collects the second-order state information accumulated over the whole trajectory.
+Using the closed-loop dynamics, one obtains
+\[
+P
+= \mathbb E[x_0x_0^\top]
++ (A+BK)\,\mathbb E[x_0x_0^\top]\,(A+BK)^\top
++ \cdots,
+\]
+and therefore, since $\mathbb E[x_0x_0^\top]=I$, the matrix $P$ \textbf{satisfies the Lyapunov equation}
+\[
+P = I + (A+BK)P(A+BK)^\top.
+\]
+This identity is fundamental. In particular, it shows that $P$ is the unique positive definite
+solution of the Lyapunov equation \textbf{if and only if} the closed-loop matrix $A+BK$ is Schur
+stable.\\
+Using this parameterization, the infinite-horizon LQR cost can be rewritten in terms of $K$
+and $P$. Indeed, since $u_t = Kx_t$, we have
+\[
+x_t^\top Q x_t + u_t^\top R u_t
+= x_t^\top (Q + K^\top R K)x_t,
+\]
+hence summing over time and taking expectations gives
+\[
+J(K)
+=
+\mathrm{Tr}(QP) + \mathrm{Tr}(K^\top R K\, P).
+\]
+Therefore, the \textbf{infinite-horizon LQR problem can be expressed as}
+\[
+\begin{aligned}
+\min_{K,\;P \succ 0}\quad
+& \mathrm{Tr}(QP) + \mathrm{Tr}(K^\top R K\,P) \\
+\text{s.t.}\quad
+& P = I + (A+BK)P(A+BK)^\top .
+\end{aligned}
+\]
+This formulation is important because it makes the optimization variable $K$ explicit and
+\textbf{replaces the dynamical system by a matrix equality constraint}. At the same time, it also makes clear that the problem is \emph{non-convex}: the Lyapunov constraint is bilinear in $K$ and $P$, and the objective also contains the product of these variables.\\
+This non-convex parameterization is nevertheless extremely useful, because it is the form from
+which many data-driven LQR methods start. The \textbf{main challenge} of data-driven LQR is precisely to recover or approximate the optimal gain $K^\star$ \textbf{without explicitly knowing the matrices} $A$ and $B$, while preserving the stabilizing and performance properties of the model-based solution.
+
+\subsection{SDP formulation of the LQR}
+
+The parameterization introduced above is very convenient conceptually, but it still leads to a
+\emph{non-convex} optimization problem:
+\[
+\begin{aligned}
+\min_{K,\;P \succ 0}\quad
+& \Tr(QP) + \Tr(K^\top R K\,P) \\
+\text{s.t.}\quad
+& P = I + (A+BK)P(A+BK)^\top .
+\end{aligned}
+\]
+The non-convexity appears in two places. First, the Lyapunov equality constraint is bilinear in
+$K$ and $P$. Second, the term $\Tr(K^\top R K\,P)$ also contains products of the decision
+variables. A remarkable fact is that this LQR problem can nevertheless be reformulated
+\emph{exactly} as a \textbf{convex semidefinite program} (SDP).\\
+Before deriving the SDP formulation, it is useful to recall a standard tool that is repeatedly used
+in control and convex optimization.
+
+\paragraph{Schur complement.}
+Consider a symmetric block matrix
+\[
+X=\begin{bmatrix}
+A & B\\
+B^\top & C
+\end{bmatrix}.
+\]
+If $C$ is invertible, the matrix
+\[
+A-BC^{-1}B^\top
+\]
+is called the \textbf{Schur complement} of $C$ in $X$.
+The corresponding lemma states that, if $C\succ 0$, then
+\[
+\begin{bmatrix}
+A & B\\
+B^\top & C
+\end{bmatrix}\succeq 0
+\qquad \Longleftrightarrow \qquad
+A-BC^{-1}B^\top \succeq 0.
+\]
+This result allows us to transform matrix inequalities involving inverses into linear matrix
+inequalities, which are exactly the constraints used in semidefinite programming.
+
+\medskip
+
+We now \textbf{derive the SDP formulation} of LQR step by step. Start from
+\begin{equation}
+\begin{aligned}
+\min_{K,\;P \succ 0}\quad
+& \Tr(QP) + \Tr(K^\top R K\,P) \\
+\text{s.t.}\quad
+& P = I + (A+BK)P(A+BK)^\top .
+\end{aligned}
+\label{eq:original}
+\end{equation}
+A first observation is that we can \textbf{replace the equality constraint by the inequality}
+\[
+P \succeq I + (A+BK)P(A+BK)^\top
+\]
+without changing the optimum. This gives the equivalent problem
+\begin{equation}
+\begin{aligned}
+\min_{K,\;P \succ 0}\quad
+& \Tr(QP) + \Tr(K^\top R K\,P) \\
+\text{s.t.}\quad
+& P \succeq I + (A+BK)P(A+BK)^\top .
+\end{aligned}
+\label{eq:relaxed}
+\end{equation}
+At first sight, this equivalence may look surprising, so it is worth understanding why it is true.\\
+Fix a feedback gain $K$ such that $A+BK$ is Schur stable, and let $P_K$ denote the unique
+positive definite solution of the Lyapunov equation
+\begin{equation}
+P_K = I + (A+BK)P_K(A+BK)^\top.
+\label{eq:Lyapunov}
+\end{equation}
+Now consider any matrix $P$ satisfying the inequality
+\begin{equation}
+P \succeq I + (A+BK)P(A+BK)^\top.
+\label{eq:inequality}
+\end{equation}
+Define the difference
+\[
+Y := P - P_K.
+\]
+Subtracting \eqref{eq:Lyapunov} from \eqref{eq:inequality}, we obtain
+\[
+Y \succeq (A+BK)\,Y\,(A+BK)^\top.
+\]
+Iterating this inequality yields
+\[
+Y \succeq (A+BK)\,Y\,(A+BK)^\top
+\succeq (A+BK)^2\,Y\,\big((A+BK)^\top\big)^2
+\succeq \cdots \succeq 0.
+\]
+Hence $Y \succeq 0$, that is,
+\[
+P \succeq P_K.
+\]
+Therefore, for a fixed stabilizing $K$, the smallest feasible matrix $P$ is exactly the Lyapunov
+solution $P_K$. Since the objective is linear and increasing in $P$ (recall that $Q\succeq 0$ and
+$R\succ 0$), the optimizer will always choose the smallest feasible $P$, so the inequality in
+\eqref{eq:relaxed} is active at the optimum. This explains why \eqref{eq:original} and \eqref{eq:relaxed} are equivalent.
+
+\medskip
+
+The next step is to \textbf{eliminate the bilinear term in the constraint} by introducing the change of
+variables
+\[
+L := KP.
+\]
+Using this substitution, the constraint in \eqref{eq:relaxed} becomes
+\[
+P - I - (AP+BL)P^{-1}(AP+BL)^\top \succeq 0.
+\]
+This expression is still nonlinear because of the inverse $P^{-1}$, but now it is in a form where
+the Schur complement can be applied. Since $P\succ 0$, the Schur complement lemma implies
+that the inequality above is equivalent to the linear matrix inequality
+\begin{equation}
+\begin{bmatrix}
+P-I & AP+BL\\
+(AP+BL)^\top & P
+\end{bmatrix}
+\succeq 0.
+\end{equation}
+So the Lyapunov inequality has now been converted into an Linear Matrix Inequality, which is convex in the
+variables $P$ and $L$.\\
+
+We now turn to the objective function. Since $L=KP$, one would like to replace the term
+$KPK^\top$ by a new matrix variable. Introduce
+\[
+M := KPK^\top.
+\]
+Then
+\[
+\Tr(K^\top RKP)=\Tr(RKPK^\top)=\Tr(RM),
+\]
+and the objective becomes
+\[
+\Tr(QP)+\Tr(RM).
+\]
+However, the identity $M=KPK^\top$ is again nonlinear. As before, we relax it to the inequality
+\[
+M \succeq KPK^\top.
+\]
+This leads to
+\[
+M - KPK^\top \succeq 0.
+\]
+Using $L=KP$, this can be rewritten as
+\[
+M - LP^{-1}L^\top \succeq 0.
+\]
+Applying again the Schur complement with respect to $P\succ 0$, we obtain the equivalent LMI
+\begin{equation}
+\begin{bmatrix}
+M & L\\
+L^\top & P
+\end{bmatrix}
+\succeq 0.
+\label{eq:Schur}
+\end{equation}
+As in the previous step, this relaxation is tight at the optimum because the objective is linear in
+$M$ and $R\succ 0$, so the optimizer will choose the smallest feasible $M$.\\
+Putting everything together, we arrive at the \textbf{SDP formulation of the infinite-horizon LQR}:
+\begin{equation}
+\begin{aligned}
+\min_{L,M,P}\quad
+& \Tr(QP)+\Tr(RM)\\
+\text{s.t.}\quad
+& \begin{bmatrix}
+M & L\\
+L^\top & P
+\end{bmatrix}\succeq 0,\\[1em]
+& \begin{bmatrix}
+P-I & AP+BL\\
+(AP+BL)^\top & P
+\end{bmatrix}\succeq 0,\\
+& P \succ 0.
+\end{aligned}
+\end{equation}
+This is now a \textbf{convex optimization problem}: the objective is affine in the decision variables
+and the constraints are positive semidefinite constraints, that is, linear matrix inequalities.\\
+
+Once the problem has been solved, the optimal feedback gain is recovered from
+\[
+K = LP^{-1}.
+\]
+So, although the original LQR problem was written in a non-convex form in terms of $K$ and
+$P$, it admits an equivalent convex reformulation in the lifted variables $(L,M,P)$.\\
+
+This result is much more than a technical curiosity. Semidefinite programming plays a central
+role in modern control because many synthesis and analysis problems can be written in terms of
+LMIs after a suitable change of variables. The LQR problem is one of the cleanest examples of
+this idea: a nonlinear controller synthesis problem can be converted into a convex optimization
+problem for which global optimality is guaranteed.\\
+For us, this SDP viewpoint is particularly useful because it opens the door to \textbf{data-driven}
+reformulations. Indeed, once the model-based LQR problem has been written in terms of matrix
+inequalities, one can try to replace the quantities involving $A$ and $B$ by quantities constructed
+directly from data.
+
+\subsection{From model-based to data-driven LQR}
+
+At this point it is useful to step back and summarize the situation. For the infinite-horizon
+LQR problem, we have seen three equivalent \emph{model-based} solution routes:
+\begin{itemize}
+    \item dynamic programming;
+    \item the algebraic Riccati equation;
+    \item the SDP formulation.
+\end{itemize}
+Although these approaches look quite different, they all share the same fundamental
+requirement: \textbf{they need the matrices $A$ and $B$ to be known}. Dynamic programming
+needs the model to write the Bellman recursion, the Riccati approach needs the model to form
+the algebraic Riccati equation, and the SDP formulation also contains $A$ and $B$ explicitly in
+its constraints. Therefore, if the system matrices are not available, none of these procedures can
+be applied directly.\\
+This observation motivates the central question of this chapter:
+\begin{quote}
+\emph{Can we design the optimal LQR controller directly from data, without first having an
+exact model of the system?}
+\end{quote}
+This question belongs to the broader area of \textbf{data-driven control}. At a high level, one can
+distinguish two main philosophies.
+
+\paragraph{Indirect data-driven control.}
+In the indirect approach, one first uses data to identify a model of the system, together with a
+description of the uncertainty, and then one designs a controller based on the identified model.
+In short, the logic is
+\[
+\text{data} \;\longrightarrow\; \text{model identification} + \text{uncertainty quantification}
+\;\longrightarrow\; \text{control design}.
+\]
+This is the classical modular viewpoint: first system identification, then control synthesis.
+
+\paragraph{Direct data-driven control.}
+A different philosophy is to \emph{bypass explicit model identification} and attempt to compute a
+controller directly from data. This is the so-called \textbf{direct} data-driven approach. In recent
+years this viewpoint has attracted a lot of attention, partly because it promises to avoid the
+intermediate identification step and to exploit data more directly for control design.\\
+
+However, this promise comes with several trade-offs. In particular, when comparing indirect and
+direct approaches, one should keep in mind issues such as:
+\begin{itemize}
+    \item modularity versus non-modularity;
+    \item computational tractability;
+    \item optimality versus suboptimality;
+    \item robustness and robust stability guarantees;
+    \item the amount of data required.
+\end{itemize}
+For the LQR problem, these questions can be addressed quite explicitly, which is one of the
+reasons why LQR is an ideal benchmark for studying data-driven control design.
+
+\subsection{Indirect data-driven control}
+\subsubsection{System identification from input-state data}
+
+Let us start from the indirect route. Suppose that the system evolves according to
+\[
+x_{t+1} = A x_t + B u_t + w_t,
+\]
+where $w_t$ is a process disturbance or modeling error. Assume that we collect a trajectory of
+state-input data and arrange it into the matrices
+\[
+X_0 = \begin{bmatrix} x_0 & x_1 & \cdots & x_{T-1} \end{bmatrix},
+\qquad
+U_0 = \begin{bmatrix} u_0 & u_1 & \cdots & u_{T-1} \end{bmatrix},
+\]
+\[
+W_0 = \begin{bmatrix} w_0 & w_1 & \cdots & w_{T-1} \end{bmatrix},
+\qquad
+X_1 = \begin{bmatrix} x_1 & x_2 & \cdots & x_T \end{bmatrix}.
+\]
+By stacking the dynamics over the whole trajectory, we obtain the compact relation
+\[
+X_1 = A X_0 + B U_0 + W_0.
+\]
+This matrix equation is the starting point for identification from data. It tells us that the
+unknown matrices $A$ and $B$ must explain, as well as possible, the one-step transitions
+observed in the data.\\
+A fundamental requirement is that the data be sufficiently informative. In this context, the
+relevant notion is \textbf{persistence of excitation}. More precisely, the data are said to be
+sufficiently exciting if
+\[
+\rank\!\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}
+= n+m,
+\]
+where $n$ is the state dimension and $m$ is the input dimension.
+This rank condition means that the collected trajectory excites all state and input directions
+needed to identify the dynamics. If the data do not satisfy this condition, then different pairs
+$(A,B)$ may be consistent with the same observations, and the model cannot be uniquely
+reconstructed.\\
+
+Given the data, a natural identification procedure is ordinary least squares. One solves
+\[
+[\hat B,\hat A]
+=
+\arg\min_{B,A}
+\left\|
+X_1 - [B,\;A]
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}
+\right\|_F.
+\]
+Equivalently, one searches for the matrices $A$ and $B$ that best fit the observed one-step
+state transitions in the Frobenius norm sense. Under the persistence of excitation condition, this
+least-squares problem has a unique solution. Hence, with sufficiently rich data, one can recover
+an estimate $(\hat A,\hat B)$ of the system matrices.
+
+\subsubsection{Indirect and certainty-equivalent LQR}
+
+Once the model has been identified, the most immediate strategy is simply to replace the true
+unknown matrices $(A,B)$ by their estimates $(\hat A,\hat B)$ and then solve the LQR problem as
+if the estimated model were exact. This is the classical \textbf{certainty-equivalence principle}.\\
+Using the LQR parameterization introduced earlier, the certainty-equivalent design solves
+\[
+\begin{aligned}
+\min_{K,\;P \succ 0}\quad
+& \Tr(QP) + \Tr(K^\top R K\,P) \\
+\text{s.t.}\quad
+& P = I + (\hat A+\hat B K)P(\hat A+\hat B K)^\top,
+\end{aligned}
+\]
+where the identified model is obtained from the least-squares problem
+\[
+[\hat B,\hat A]
+=
+\arg\min_{B,A}
+\left\|
+X_1 - [B,\;A]
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}
+\right\|_F.
+\]
+In words, the procedure is:
+\begin{enumerate}
+    \item collect input-state data;
+    \item identify $(\hat A,\hat B)$ from the data;
+    \item design the LQR controller for the estimated model.
+\end{enumerate}
+This is why the method is called \textbf{indirect}: the data are used only to build a model, and
+the controller is then synthesized by a standard model-based technique.\\
+The certainty-equivalent approach is widely used both in theory and in applications. The main
+reasons are clear:
+\begin{itemize}
+    \item it is \textbf{modular}, because identification and control design are separated;
+    \item it is \textbf{tractable}, since after identification one can use the Riccati equation or the SDP
+    formulation developed earlier;
+    \item it requires only the minimum amount of excitation needed to identify the model, namely
+    enough data to recover $n+m$ independent directions.
+\end{itemize}
+At the same time, it also has \textbf{clear limitations}. Since the controller is designed for the estimated
+model rather than the true one, the resulting gain is generally only \textbf{suboptimal} for the real
+system. Moreover,\textbf{ robustness} is only moderate unless one explicitly accounts for identification
+errors and uncertainty in the design step. In other words, certainty-equivalence is simple and
+powerful, but it does not by itself provide a complete answer to the issue of robustness.
+
+This discussion highlights a key tension in data-driven control. The indirect route is attractive
+because it preserves the classical architecture of \emph{identification first, control second}, and
+therefore remains easy to analyze and implement. On the other hand, it may fail to fully exploit
+the information in the data for the actual control objective.
+
+\subsection{Direct data-driven LQR via trajectory parameterization}
+
+The indirect approach discussed above follows the classical two-step pipeline
+\[
+\text{data} \;\longrightarrow\; (\hat A,\hat B) \;\longrightarrow\; K.
+\]
+A natural question is whether one can avoid the explicit identification step and parameterize the
+controller directly in terms of the collected data. This leads to a \textbf{direct} data-driven
+formulation of LQR.\\
+The key idea is to use the input-state trajectory itself as a parameterization device. Recall that,
+for the noisy system
+\[
+x_{t+1} = A x_t + B u_t + w_t,
+\]
+the stacked data matrices satisfy
+\[
+X_1 = A X_0 + B U_0 + W_0.
+\]
+Assume again that the data are persistently exciting, namely
+\[
+\rank\!\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}=n+m.
+\]
+This rank condition has an important consequence: for \emph{every} feedback gain $K$ there
+exists a matrix $G$ such that
+\begin{equation}
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}G.
+\label{eq:KGparam}
+\end{equation}
+So the pair $(K,I)$ can be represented as a linear combination of the columns of the measured
+data matrix. This is the basic trajectory parameterization.\\
+Once \eqref{eq:KGparam} is available, the closed-loop matrix can also be written directly in terms
+of the data. Indeed,
+\[
+A+BK
+=
+[B\;\;A]
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+[B\;\;A]
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}G.
+\]
+Using the data equation
+\[
+[B\;\;A]
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}
+=
+X_1-W_0,
+\]
+we obtain
+\begin{equation}
+A+BK = (X_1-W_0)G.
+\label{eq:closedloopdata}
+\end{equation}
+This identity is crucial: it shows that the unknown closed-loop matrix can be represented from
+data through the variable $G$.\\
+If the noise term $W_0$ is neglected, the relation simplifies to
+\[
+A+BK = X_1G.
+\]
+This is exactly the certainty-equivalent viewpoint in direct form: \textbf{one behaves as if the measured
+data were generated by a noise-free system}. In that sense, the indirect certainty-equivalent
+approach and the direct certainty-equivalent approach are closely related.\\
+
+Substituting the relation $A+BK=X_1G$ into the LQR parameterization yields a direct
+data-driven reformulation:
+\[
+\begin{aligned}
+\min_{P \succeq I,\;K,\;G}\quad
+& \Tr(QP)+\Tr(K^\top RKP)\\
+\text{s.t.}\quad
+& X_1GPG^\top X_1^\top - P + I \preceq 0,\\
+& \begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}G.
+\end{aligned}
+\]
+The first constraint is simply the Lyapunov inequality written using the data-based expression
+for the closed-loop matrix, while the second constraint imposes consistency between the gain
+$K$ and the trajectory parameterization $G$.\\
+A useful \textbf{interpretation} is obtained by solving the second constraint explicitly. Since
+\[
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}G,
+\]
+we get
+\[
+K = U_0G,
+\qquad
+I = X_0G.
+\]
+Hence the optimization variables can be reduced to $(G,P)$ and the problem becomes
+\[
+\begin{aligned}
+\min_{G,\;P \succ 0}\quad
+& \Tr(QP)+\Tr\!\big(G^\top U_0^\top R U_0 G P\big)\\
+\text{s.t.}\quad
+& X_1GPG^\top X_1^\top - P + I \preceq 0,\\
+& X_0G = I.
+\end{aligned}
+\]
+This makes clear that $G$ itself plays the role of the \textbf{policy parameter}. Indeed, the control law is
+\[
+u_t = Kx_t = U_0Gx_t,
+\]
+and, correspondingly, the closed-loop dynamics become
+\[
+x_{t+1} = X_1Gx_t,
+\]
+again in the noise-free certainty-equivalent interpretation.
+
+\subsubsection{Non-uniqueness of the trajectory parameterization}
+
+An important feature of this direct formulation is that the matrix $G$ is generally \emph{not
+unique}. The reason is that the linear system
+\[
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}G
+\]
+may have infinitely many solutions whenever the data matrix
+\[
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}
+\]
+has more columns than rows. In that case, the set of feasible $G$ contains an affine subspace
+whose direction is precisely the nullspace
+\[
+\ker\!\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}.
+\]
+So two different matrices $G$ may generate the same gain $K$ and still satisfy the consistency
+constraint.\\
+This non-uniqueness is not just a technical detail. It means that the direct formulation admits
+extra degrees of freedom that are invisible at the level of $K$. Those degrees of freedom can be
+used either in a favorable way or in a harmful way, depending on how the optimization problem
+is regularized. This is why, in practice, one usually augments the direct formulation with a
+\textbf{regularizer} that selects one particular representative among all feasible $G$.\\
+
+Broadly speaking, two types of regularization are of special interest:
+\begin{itemize}
+    \item a \textbf{certainty-equivalence-promoting} regularizer, which selects the solution most closely
+    related to the least-squares model estimate;
+    \item a \textbf{robustness-promoting} regularizer, which exploits the extra freedom in $G$ to improve
+    robustness with respect to noise and uncertainty.
+\end{itemize}
+So, in the direct approach, regularization is not only a numerical device: it is part of the control
+design itself.
+
+\subsubsection{Equivalence between direct and indirect certainty-equivalent LQR}
+
+The previous discussion suggests that there should be a precise connection between the direct
+and indirect approaches. In fact, under a suitable choice of regularization, the direct
+certainty-equivalent formulation is equivalent to the indirect one based on least-squares
+identification.\\
+
+To see the mechanism, recall that among all solutions of
+\[
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}G,
+\]
+one can single out the minimum-norm solution
+\[
+G =
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^{\dagger}
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix},
+\]
+where ${}^\dagger$ denotes the pseudoinverse. Equivalently, one can enforce
+that $G$ be orthogonal to the nullspace of the data matrix. Writing
+\[
+\Pi := I -
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^{\dagger}
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix},
+\]
+the matrix $\Pi$ is the orthogonal projector onto
+\[
+\ker\!\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}.
+\]
+Therefore, the orthogonality condition can be written as
+\[
+\Pi G = 0.
+\]
+It is useful to remember the main properties of this projector:
+\[
+\Pi^2 = \Pi,
+\qquad
+\Pi^\top = \Pi,
+\qquad
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}\Pi = 0.
+\]
+Now substitute the minimum-norm expression for $G$ into the direct formulation. Since
+\[
+G =
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^{\dagger}
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix},
+\]
+we obtain
+\[
+X_1G
+=
+X_1
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^{\dagger}
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}.
+\]
+On the other hand, the least-squares estimates introduced before satisfy
+\[
+[\hat B\;\;\hat A]
+=
+X_1
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^{\dagger}.
+\]
+Hence
+\[
+X_1G
+=
+[\hat B\;\;\hat A]
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+\hat A+\hat B K.
+\]
+This shows that the data-based closed-loop matrix appearing in the direct approach coincides
+exactly with the identified closed-loop matrix of the indirect least-squares model.
+
+As a consequence, once the orthogonality constraint $\Pi G=0$ is imposed, the direct
+certainty-equivalent problem becomes equivalent to the indirect certainty-equivalent LQR problem
+\[
+\begin{aligned}
+\min_{P \succeq I,\;K}\quad
+& \Tr(QP)+\Tr(K^\top RKP)\\
+\text{s.t.}\quad
+& (\hat A+\hat B K)P(\hat A+\hat B K)^\top - P + I \preceq 0,
+\end{aligned}
+\]
+with
+\[
+[\hat B\;\;\hat A]
+=
+\arg\min_{B,A}
+\left\|
+X_1 - [B\;\;A]
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}
+\right\|_F.
+\]
+So the indirect least-squares route is not disconnected from the direct one: it corresponds to a
+specific way of choosing the trajectory parameterization, namely the \textbf{minimum-norm choice of
+$G$ orthogonal to the nullspace of the data matrix}.\\
+This equivalence is conceptually important. It tells us that certainty-equivalence is not tied to
+the explicit identification of a model; rather, it can also be understood as a particular
+regularization of the direct data-driven parameterization. At the same time, it clarifies where
+direct approaches may depart from indirect ones: by exploiting the nullspace freedom in $G$,
+one may design regularizers that do \emph{not} reproduce least-squares identification and that
+instead aim at improved robustness.
+
+\subsubsection{Certainty-equivalence-promoting regularization}
+
+We now make the previous equivalence more operational. In the trajectory-parameterized direct
+formulation, the ambiguity in $G$ comes from the nullspace of the data matrix
+\[
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}.
+\]
+If one wants the direct solution to reproduce the same behavior as the indirect least-squares
+approach, then one should select the representative of $G$ that is orthogonal to this nullspace.\\
+Recall the projector
+\[
+\Pi := I -
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^{\dagger}
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix},
+\]
+which is the orthogonal projector onto
+\[
+\ker\!\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}.
+\]
+The exact orthogonality constraint
+\[
+\Pi G = 0
+\]
+forces $G$ to belong to the orthogonal complement of the nullspace, and therefore selects the
+minimum-norm solution
+\[
+G =
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^{\dagger}
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}.
+\]
+As we have seen, this is precisely the choice that makes the direct certainty-equivalent
+formulation equivalent to the indirect least-squares LQR design.\\
+Instead of imposing the hard constraint $\Pi G=0$, one can \textbf{lift it to the objective} and use
+it as a regularizer. This leads to the optimization problem
+\[
+\begin{aligned}
+\min_{P \succeq I,\;K,\;G}\quad
+& \Tr(QP)+\Tr(K^\top RKP)+\lambda \|\Pi G\| \\
+\text{s.t.}\quad
+& X_1GPG^\top X_1^\top - P + I \preceq 0,\\
+& \begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}G.
+\end{aligned}
+\]
+Here $\lambda \ge 0$ is a tuning parameter. When $\lambda$ is large, the optimizer is strongly
+encouraged to make $\Pi G$ small, that is, to choose $G$ almost orthogonal to the nullspace of
+the data matrix. In the limit, this reproduces the same effect as the hard orthogonality
+constraint.\\
+
+This regularizer is therefore \textbf{certainty-equivalence-promoting}: it biases the direct
+data-driven problem toward the same solution that would be obtained by first identifying a
+least-squares model and then designing the LQR controller for that model.
+
+The parameter $\lambda$ has a clear interpretation. It interpolates between two extremes:
+\begin{itemize}
+    \item if $\lambda=0$, the optimizer is free to exploit the whole family of feasible matrices $G$,
+    including the nullspace directions;
+    \item if $\lambda$ is very large, the optimizer is pushed toward the minimum-norm solution
+    associated with least-squares system identification.
+\end{itemize}
+In this sense, $\lambda$ acts as a knob that interpolates between \textbf{pure control design} and
+\textbf{system-identification-driven design}. This is conceptually useful because it shows that direct
+and indirect methods are not two completely disconnected worlds, but rather two endpoints of a
+continuum of regularized formulations.
+
+\subsubsection{Robustness-promoting regularization for trajectory parameterization}
+
+The previous regularizer promotes equivalence with least-squares identification, but it does not
+explicitly address robustness with respect to noise. To understand how robustness enters, it is
+useful to go back to the noisy data relation
+\[
+A+BK = (X_1-W_0)G.
+\]
+In the certainty-equivalent formulation, one replaces this by the nominal approximation
+\[
+A+BK \approx X_1G,
+\]
+thereby neglecting the noise term $W_0G$. The issue is that this noise term is multiplied by
+$G$, so large values of $G$ amplify the effect of data perturbations on the reconstructed
+closed-loop matrix.\\
+The same phenomenon appears in the Lyapunov inequality. The nominal direct constraint is
+\[
+X_1GPG^\top X_1^\top - P + I \preceq 0,
+\]
+whereas the true noisy relation would involve
+\[
+(X_1-W_0)GPG^\top (X_1-W_0)^\top - P + I \preceq 0.
+\]
+So the discrepancy between the nominal and true constraints depends on the matrix
+\[
+GPG^\top.
+\]
+This suggests the following principle: \textbf{for robustness, the quantity $GPG^\top$ should be
+kept small}. Intuitively, if $GPG^\top$ is small, then the effect of the unknown term $W_0$ on
+the closed-loop Lyapunov inequality is less pronounced.\\
+This motivates the robustness-promoting regularized problem
+\[
+\begin{aligned}
+\min_{P \succeq I,\;K,\;G}\quad
+& \Tr(QP)+\Tr(K^\top RKP)+\lambda \|GPG^\top\| \\
+\text{s.t.}\quad
+& X_1GPG^\top X_1^\top - P + I \preceq 0,\\
+& \begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}G.
+\end{aligned}
+\]
+The regularization term penalizes solutions for which the policy parameterization is too
+sensitive to data perturbations. In contrast with the certainty-equivalence-promoting regularizer,
+which selects the minimum-norm representative in the affine family of feasible $G$, this new
+term explicitly aims at reducing the amplification of noise in the Lyapunov constraint.\\
+
+There is also a useful connection between the two types of regularization. Since the nullspace
+directions of $G$ are precisely those that are invisible in the consistency constraint
+\[
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}G,
+\]
+they may still enlarge $GPG^\top$ without changing the nominal gain $K$. For this reason, the
+projection regularizer $\|\Pi G\|$ can also indirectly help to keep $GPG^\top$ small. So the
+certainty-equivalence-promoting and robustness-promoting regularizers are different, but not
+completely unrelated.
+
+\subsubsection{Summary and limitations of direct trajectory parameterization}
+
+We can now summarize the direct LQR formulation based on trajectory parameterization. The
+starting point is the fact that, under persistence of excitation,
+\[
+\forall K\;\; \exists G \;\; \text{such that}\;\;
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}G,
+\]
+and hence
+\[
+A+BK = (X_1-W_0)G.
+\]
+Neglecting the noise yields the nominal direct certainty-equivalent relation
+\[
+A+BK = X_1G.
+\]
+This leads to a direct data-driven LQR formulation in which the controller is parameterized by
+the matrix $G$ instead of by an explicit model $(A,B)$.
+
+Because $G$ is not unique, regularization is essential. Two important choices are:
+\begin{itemize}
+    \item the \textbf{certainty-equivalence-promoting regularizer} $\|\Pi G\|$, which selects the
+    least-squares-compatible representative;
+    \item the \textbf{robustness-promoting regularizer} $\|GPG^\top\|$, which tries to reduce sensitivity
+    to noise.
+\end{itemize}
+This framework is attractive because it bypasses explicit model identification and keeps the
+entire design directly at the data level. However, it also has important drawbacks.\\
+
+The first drawback is that the \textbf{dimension of the optimization variable $G$ grows with the amount
+of data}. If the experiment contains many samples, then $G$ has many rows, and the
+optimization problem becomes increasingly large. So, unlike model-based or indirect approaches,
+this parameterization does not have a complexity that is determined only by the state and input
+dimensions.\\
+The second drawback is that \textbf{regularization is not optional}. Because of the non-uniqueness
+of $G$, some regularizing principle must be introduced in order to select a meaningful solution.
+This is not merely a numerical issue: different regularizers correspond to different control
+design philosophies, such as certainty-equivalence or robustness.\\
+These observations motivate the search for alternative direct parameterizations that retain the
+advantages of data-driven design but avoid the explicit dependence on the full data length. This
+is exactly the role of the \emph{sample covariance parameterization}, which we discuss next.
+
+\subsection{Direct data-driven LQR via sample covariance parameterization}
+
+The trajectory-based parameterization uses the full data matrices $X_0$, $U_0$, and $X_1$.
+A different possibility is to compress the information contained in the data through sample
+covariances. This leads to a direct formulation whose dimension no longer grows with the
+number of collected samples.\\
+
+Starting from the same data equation
+\[
+X_1 = AX_0 + BU_0 + W_0,
+\]
+define the sample covariance matrices
+\[
+\Phi :=
+\frac{1}{T}
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^\top,
+\qquad
+\Phi^+ :=
+\frac{1}{T}
+X_1
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^\top.
+\]
+Under the persistence of excitation condition,
+\[
+\rank\!\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}=n+m,
+\]
+the matrix $\Phi$ is positive definite:
+\[
+\Phi \succ 0.
+\]
+This is the covariance analogue of the full-row-rank property used in the trajectory
+parameterization.\\
+The covariance parameterization is based on the observation that, for every gain $K$, there
+exists a matrix $V$ such that
+\begin{equation}
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+\frac{1}{T}
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^\top V
+=
+\Phi V.
+\label{eq:cov-param}
+\end{equation}
+So the role played previously by $G$ is now taken by a matrix $V$ living in the smaller space
+associated with the sample covariance matrix.\\
+Using \eqref{eq:cov-param}, the closed-loop matrix becomes
+\[
+A+BK
+=
+[B\;\;A]
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+[B\;\;A]\Phi V.
+\]
+From the data equation, this can be rewritten as
+\[
+A+BK
+=
+\frac{1}{T}(X_1-W_0)
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^\top V.
+\]
+If noise is neglected, one obtains the certainty-equivalent approximation
+\[
+A+BK = \Phi^+ V.
+\]
+So, exactly as in the trajectory case, the unknown closed-loop matrix is replaced by a quantity
+constructed directly from the data, but now only through the empirical covariances $\Phi$ and
+$\Phi^+$.\\
+Substituting this relation into the LQR parameterization gives the covariance-based direct
+formulation
+\[
+\begin{aligned}
+\min_{K,\;P \succeq I,\;V}\quad
+& \Tr(QP)+\Tr(K^\top RKP)\\
+\text{s.t.}\quad
+& P = I + (\Phi^+V)P(\Phi^+V)^\top,\\
+& \begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+= \Phi V.
+\end{aligned}
+\]
+Equivalently, since $\Phi \succ 0$, the second constraint determines $V$ uniquely as
+\[
+V = \Phi^{-1}
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}.
+\]
+This is a major difference with respect to the trajectory parameterization: in the covariance
+parameterization the auxiliary variable is \textbf{unique}, so the nullspace ambiguity disappears.\\
+This has several important consequences:
+\begin{itemize}
+    \item the dimension of the parameterization is \textbf{independent of the data length} $T$;
+    \item the covariance matrices admit \textbf{recursive rank-one updates}, so the parameterization is
+    naturally suitable for online data accumulation;
+    \item the auxiliary variable $V$ is uniquely determined, so no nullspace regularization is
+    needed to select among infinitely many representatives.
+\end{itemize}
+Moreover, this covariance formulation is again equivalent to indirect certainty-equivalent LQR.
+Indeed, from
+\[
+\Phi^+ \Phi^{-1}
+=
+\frac{1}{T}
+X_1
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^\top
+\left(
+\frac{1}{T}
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^\top
+\right)^{-1},
+\]
+one recovers the same least-squares estimate as before:
+\[
+[\hat B\;\;\hat A] = \Phi^+\Phi^{-1}.
+\]
+Therefore,
+\[
+\Phi^+V
+=
+\Phi^+\Phi^{-1}
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+[\hat B\;\;\hat A]
+\begin{bmatrix}
+K\\[0.3em]
+I
+\end{bmatrix}
+=
+\hat A+\hat B K.
+\]
+So the covariance-based direct parameterization is another way of writing the same
+certainty-equivalent closed-loop matrix, but in a compressed form that depends only on sample
+covariances.
+
+\subsubsection{Robustness-promoting regularization for covariance parameterization}
+
+The covariance formulation removes the nullspace ambiguity, but it does not remove the effect
+of noise. Indeed, the exact noisy relation is
+\[
+A+BK=
+\frac{1}{T}(X_1-W_0)
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^\top V.
+\]
+When this expression is substituted into the Lyapunov inequality, one obtains terms of the form
+\[
+\frac{1}{T^2}
+(X_1-W_0)
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^\top
+VPV^\top
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}
+(X_1-W_0)^\top.
+\]
+The nominal certainty-equivalent approximation replaces this by
+\[
+\frac{1}{T^2}
+X_1
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^\top
+VPV^\top
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}
+X_1^\top.
+\]
+The gap between the noisy and nominal terms is governed by the middle factor
+\[
+\frac{1}{T}
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^\top
+VPV^\top
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}.
+\]
+Its trace can be written as
+\[
+\Tr\!\left(
+\frac{1}{T}
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}^\top
+VPV^\top
+\begin{bmatrix}
+U_0\\[0.3em]
+X_0
+\end{bmatrix}
+\right)
+=
+\Tr(\Phi V P V^\top).
+\]
+This suggests that, in the covariance parameterization, a natural robustness-promoting quantity
+to keep small is
+\[
+\Tr(\Phi V P V^\top).
+\]
+So the covariance-based counterpart of robustness regularization penalizes the energy of the
+middle covariance-weighted factor through a term such as
+\[
+\lambda\,\Tr(\Phi V P V^\top).
+\]
+The intuition is exactly the same as before: the smaller this quantity is, the less sensitive the
+Lyapunov inequality becomes to the noise entering through $W_0$.\\
+
+This concludes the main constructions based on direct data-driven parameterizations. We now
+have two complementary viewpoints:
+\begin{itemize}
+    \item the \textbf{trajectory parameterization}, which is very direct and transparent but whose
+    dimension grows with the data length and requires explicit regularization;
+    \item the \textbf{sample covariance parameterization}, which compresses the data into fixed-size
+    matrices, yields a unique auxiliary variable, and recovers the same certainty-equivalent
+    solution in a more compact form.
+\end{itemize}
+
+
+\subsection{Comparison of data-driven LQR methods}
+
+We conclude this part of the chapter by comparing the main data-driven LQR approaches that we
+have introduced so far. The goal of this comparison is not to declare a universally best method,
+but rather to highlight the trade-offs between \emph{modularity}, \emph{optimality},
+\emph{robustness}, and \emph{computational size}.\\
+The methods we compare are:
+\begin{itemize}
+    \item \textbf{indirect certainty-equivalent LQR}, where one first identifies $(\hat A,\hat B)$ and then
+    solves the corresponding model-based LQR problem;
+    \item \textbf{direct LQR with trajectory parameterization}, in three variants:
+    without regularization, with certainty-equivalence-promoting regularization, and with
+    robustness-promoting regularization;
+    \item \textbf{direct LQR with sample covariance parameterization}, with and without robustness
+    regularization.
+\end{itemize}
+A compact summary is reported in Table~\ref{tab:dd-lqr-comparison}.
+
+\begin{table}[h!]
+\centering
+\small
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{|l|c|ccc|cc|}
+\hline
+& \textbf{Indirect CE} & \multicolumn{3}{c|}{\textbf{Direct LQR + trajectory parameterization}} & \multicolumn{2}{c|}{\textbf{Direct LQR + covariance parameterization}} \\
+\cline{3-7}
+& \textbf{LQR} & \textbf{No reg.} & \textbf{CE reg.} & \textbf{Robust reg.} & \textbf{No reg.} & \textbf{Robust reg.} \\
+\hline
+\textbf{Modular} & Yes & No & No & No & No & No \\
+\hline
+\textbf{Optimality} & Good & Bad & Good & Bad & Good & Good \\
+\hline
+\textbf{Robust stability} & Moderate & Bad & Moderate & Good & Moderate & Good \\
+\hline
+\textbf{Problem size} & Constant & \multicolumn{3}{c|}{Scales linearly with data size} & \multicolumn{2}{c|}{Constant} \\
+\hline
+\end{tabular}%
+}
+\caption{Comparison of the main data-driven LQR methods discussed in this chapter.}
+\label{tab:dd-lqr-comparison}
+\end{table}
+We now explain the meaning of each row in the table.
+
+\paragraph{Modularity.}
+The indirect certainty-equivalent approach is the only \textbf{modular} one. Indeed, it keeps the
+classical separation
+\[
+\text{identification} \;\longrightarrow\; \text{control design},
+\]
+so the modeling step and the controller synthesis step can be developed and analyzed
+independently. By contrast, the direct methods are \textbf{non-modular}: data and control design are
+intertwined in a single optimization problem. This lack of modularity is not necessarily a
+drawback in itself, but it does make the overall design less transparent.
+
+\paragraph{Optimality.}
+The optimality row refers to how well the resulting controller aligns with the
+certainty-equivalent LQR objective.\\
+
+The \textbf{indirect CE-LQR} method is marked as \emph{good} because it computes exactly the LQR
+controller associated with the least-squares identified model. So, within the certainty-equivalent
+philosophy, it is the natural benchmark.\\
+For \textbf{trajectory parameterization without regularization}, the performance is marked as
+\emph{bad}. The reason is that the auxiliary variable $G$ is not unique, and without any principle
+to select among the feasible solutions, the optimization may exploit unfavorable nullspace
+directions. This generally breaks the connection with least-squares identification and leads to a
+controller that is no longer well aligned with the nominal LQR objective.\\
+When \textbf{certainty-equivalence-promoting regularization} is added, optimality becomes
+\emph{good}, because the projector regularizer $\|\Pi G\|$ drives the solution toward the
+minimum-norm representative associated with least-squares identification. Hence the direct
+trajectory formulation recovers the same nominal solution as the indirect approach.\\
+With \textbf{robustness-promoting regularization} in the trajectory formulation, optimality is again
+marked as \emph{bad}. This does not mean the controller is useless; rather, it means that the
+design is no longer trying to reproduce the certainty-equivalent optimum. Instead, it sacrifices
+nominal optimality in order to improve robustness.\\
+For the \textbf{covariance parameterization}, optimality is marked as \emph{good} both without and
+with robustness regularization. Without regularization, this follows from the fact that the
+covariance parameterization is uniquely determined and is equivalent to indirect
+certainty-equivalent LQR. With robustness regularization, the table still marks the method as
+good, reflecting the fact that the covariance formulation preserves a much cleaner and more
+well-posed connection with the certainty-equivalent solution than the unregularized trajectory
+formulation.
+
+\paragraph{Robust stability.}
+The robustness row summarizes how reliable the different methods are in the presence of noisy
+data and modeling errors.\\
+
+For \textbf{indirect CE-LQR}, robustness is classified as \emph{moderate}. This is consistent with the
+discussion above: certainty-equivalence is simple and often effective, but it does not explicitly
+optimize robustness unless additional uncertainty-aware design steps are introduced.\\
+For \textbf{trajectory parameterization without regularization}, robustness is \emph{bad}. This is the
+least protected formulation, since the non-uniqueness of $G$ may amplify noise significantly and
+there is no mechanism preventing harmful solutions.\\
+With \textbf{certainty-equivalence-promoting regularization}, robustness improves to
+\emph{moderate}. In this case, the direct method essentially reproduces the least-squares indirect
+solution, so its robustness properties are similar to those of indirect CE-LQR.\\
+With \textbf{robustness-promoting regularization}, the trajectory-based direct method becomes
+\emph{good} from the robustness viewpoint, because the added penalty explicitly aims at reducing
+quantities such as $GPG^\top$, which control the sensitivity of the Lyapunov constraint to noise.\\
+The same logic applies to the \textbf{covariance parameterization}. Without extra regularization, its
+robustness is \emph{moderate}, since it is again tied to certainty-equivalence. Once a suitable
+robustness-promoting penalty is added, robustness becomes \emph{good}.
+
+\paragraph{Problem size.}
+The last row concerns the computational dimension of the optimization problem.\\
+
+For \textbf{indirect CE-LQR}, the problem size is \textbf{constant} once the model has been identified,
+because the controller synthesis depends only on the state and input dimensions $(n,m)$.\\
+For the \textbf{trajectory-parameterized direct methods}, the problem size \textbf{scales linearly with the
+amount of data}. This is because the matrix $G$ has as many rows as there are data points in the
+experiment. Hence, as more samples are collected, the optimization problem grows.\\
+For the \textbf{covariance-parameterized direct methods}, the problem size is again \textbf{constant},
+because the data enter only through the fixed-size matrices $\Phi$ and $\Phi^+$. This is one of the
+main reasons why the covariance formulation is attractive in practice.\\
+
+The table makes the trade-offs quite visible.\\
+Indirect certainty-equivalent LQR is attractive because it is modular, has fixed problem size,
+and provides a good nominal solution, but its robustness is only moderate.\\
+Direct trajectory parameterization is conceptually very flexible and can be made robust, but it
+has two main weaknesses: its dimension grows with data size, and regularization is essential.\\
+Direct covariance parameterization keeps the direct data-driven spirit while avoiding the growth
+with data size. It also preserves the connection with certainty-equivalent design in a much more
+compact way, and it can be enhanced with robustness-promoting regularization.\\
+
+So, roughly speaking:
+\begin{itemize}
+    \item \textbf{indirect CE-LQR} is the simplest modular baseline;
+    \item \textbf{direct trajectory parameterization} offers the most design freedom, but at a higher
+    computational and regularization cost;
+    \item \textbf{direct covariance parameterization} provides a compact compromise between directness,
+    nominal performance, and tractability.
+\end{itemize}
+This comparison will serve as a useful reference point for interpreting the strengths and
+limitations of the different data-driven LQR constructions developed in this chapter.
