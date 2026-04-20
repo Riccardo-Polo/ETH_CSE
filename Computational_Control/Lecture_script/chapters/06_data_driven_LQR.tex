@@ -108,13 +108,13 @@ The parameterization introduced above is very convenient conceptually, but it st
 \[
 \begin{aligned}
 \min_{K,\;P \succ 0}\quad
-& \Tr(QP) + \Tr(K^\top R K\,P) \\
+& \text{Tr}(QP) + \text{Tr}(K^\top R K\,P) \\
 \text{s.t.}\quad
 & P = I + (A+BK)P(A+BK)^\top .
 \end{aligned}
 \]
 The non-convexity appears in two places. First, the Lyapunov equality constraint is bilinear in
-$K$ and $P$. Second, the term $\Tr(K^\top R K\,P)$ also contains products of the decision
+$K$ and $P$. Second, the term $\text{Tr}(K^\top R K\,P)$ also contains products of the decision
 variables. A remarkable fact is that this LQR problem can nevertheless be reformulated
 \emph{exactly} as a \textbf{convex semidefinite program} (SDP).\\
 Before deriving the SDP formulation, it is useful to recall a standard tool that is repeatedly used
@@ -151,7 +151,7 @@ We now \textbf{derive the SDP formulation} of LQR step by step. Start from
 \begin{equation}
 \begin{aligned}
 \min_{K,\;P \succ 0}\quad
-& \Tr(QP) + \Tr(K^\top R K\,P) \\
+& \text{Tr}(QP) + \text{Tr}(K^\top R K\,P) \\
 \text{s.t.}\quad
 & P = I + (A+BK)P(A+BK)^\top .
 \end{aligned}
@@ -165,7 +165,7 @@ without changing the optimum. This gives the equivalent problem
 \begin{equation}
 \begin{aligned}
 \min_{K,\;P \succ 0}\quad
-& \Tr(QP) + \Tr(K^\top R K\,P) \\
+& \text{Tr}(QP) + \text{Tr}(K^\top R K\,P) \\
 \text{s.t.}\quad
 & P \succeq I + (A+BK)P(A+BK)^\top .
 \end{aligned}
@@ -237,11 +237,11 @@ M := KPK^\top.
 \]
 Then
 \[
-\Tr(K^\top RKP)=\Tr(RKPK^\top)=\Tr(RM),
+\text{Tr}(K^\top RKP)=\text{Tr}(RKPK^\top)=\text{Tr}(RM),
 \]
 and the objective becomes
 \[
-\Tr(QP)+\Tr(RM).
+\text{Tr}(QP)+\text{Tr}(RM).
 \]
 However, the identity $M=KPK^\top$ is again nonlinear. As before, we relax it to the inequality
 \[
@@ -270,7 +270,7 @@ Putting everything together, we arrive at the \textbf{SDP formulation of the inf
 \begin{equation}
 \begin{aligned}
 \min_{L,M,P}\quad
-& \Tr(QP)+\Tr(RM)\\
+& \text{Tr}(QP)+\text{Tr}(RM)\\
 \text{s.t.}\quad
 & \begin{bmatrix}
 M & L\\
@@ -423,7 +423,7 @@ Using the LQR parameterization introduced earlier, the certainty-equivalent desi
 \[
 \begin{aligned}
 \min_{K,\;P \succ 0}\quad
-& \Tr(QP) + \Tr(K^\top R K\,P) \\
+& \text{Tr}(QP) + \text{Tr}(K^\top R K\,P) \\
 \text{s.t.}\quad
 & P = I + (\hat A+\hat B K)P(\hat A+\hat B K)^\top,
 \end{aligned}
@@ -557,7 +557,7 @@ data-driven reformulation:
 \[
 \begin{aligned}
 \min_{P \succeq I,\;K,\;G}\quad
-& \Tr(QP)+\Tr(K^\top RKP)\\
+& \text{Tr}(QP)+\text{Tr}(K^\top RKP)\\
 \text{s.t.}\quad
 & X_1GPG^\top X_1^\top - P + I \preceq 0,\\
 & \begin{bmatrix}
@@ -596,7 +596,7 @@ Hence the optimization variables can be reduced to $(G,P)$ and the problem becom
 \[
 \begin{aligned}
 \min_{G,\;P \succ 0}\quad
-& \Tr(QP)+\Tr\!\big(G^\top U_0^\top R U_0 G P\big)\\
+& \text{Tr}(QP)+\text{Tr}\!\big(G^\top U_0^\top R U_0 G P\big)\\
 \text{s.t.}\quad
 & X_1GPG^\top X_1^\top - P + I \preceq 0,\\
 & X_0G = I.
@@ -782,7 +782,7 @@ certainty-equivalent problem becomes equivalent to the indirect certainty-equiva
 \[
 \begin{aligned}
 \min_{P \succeq I,\;K}\quad
-& \Tr(QP)+\Tr(K^\top RKP)\\
+& \text{Tr}(QP)+\text{Tr}(K^\top RKP)\\
 \text{s.t.}\quad
 & (\hat A+\hat B K)P(\hat A+\hat B K)^\top - P + I \preceq 0,
 \end{aligned}
@@ -865,7 +865,7 @@ it as a regularizer. This leads to the optimization problem
 \[
 \begin{aligned}
 \min_{P \succeq I,\;K,\;G}\quad
-& \Tr(QP)+\Tr(K^\top RKP)+\lambda \|\Pi G\| \\
+& \text{Tr}(QP)+\text{Tr}(K^\top RKP)+\lambda \|\Pi G\| \\
 \text{s.t.}\quad
 & X_1GPG^\top X_1^\top - P + I \preceq 0,\\
 & \begin{bmatrix}
@@ -934,7 +934,7 @@ This motivates the robustness-promoting regularized problem
 \[
 \begin{aligned}
 \min_{P \succeq I,\;K,\;G}\quad
-& \Tr(QP)+\Tr(K^\top RKP)+\lambda \|GPG^\top\| \\
+& \text{Tr}(QP)+\text{Tr}(K^\top RKP)+\lambda \|GPG^\top\| \\
 \text{s.t.}\quad
 & X_1GPG^\top X_1^\top - P + I \preceq 0,\\
 & \begin{bmatrix}
@@ -1123,7 +1123,7 @@ formulation
 \[
 \begin{aligned}
 \min_{K,\;P \succeq I,\;V}\quad
-& \Tr(QP)+\Tr(K^\top RKP)\\
+& \text{Tr}(QP)+\text{Tr}(K^\top RKP)\\
 \text{s.t.}\quad
 & P = I + (\Phi^+V)P(\Phi^+V)^\top,\\
 & \begin{bmatrix}
@@ -1257,7 +1257,7 @@ X_0
 \]
 Its trace can be written as
 \[
-\Tr\!\left(
+\text{Tr}\!\left(
 \frac{1}{T}
 \begin{bmatrix}
 U_0\\[0.3em]
@@ -1270,17 +1270,17 @@ X_0
 \end{bmatrix}
 \right)
 =
-\Tr(\Phi V P V^\top).
+\text{Tr}(\Phi V P V^\top).
 \]
 This suggests that, in the covariance parameterization, a natural robustness-promoting quantity
 to keep small is
 \[
-\Tr(\Phi V P V^\top).
+\text{Tr}(\Phi V P V^\top).
 \]
 So the covariance-based counterpart of robustness regularization penalizes the energy of the
 middle covariance-weighted factor through a term such as
 \[
-\lambda\,\Tr(\Phi V P V^\top).
+\lambda\,\text{Tr}(\Phi V P V^\top).
 \]
 The intuition is exactly the same as before: the smaller this quantity is, the less sensitive the
 Lyapunov inequality becomes to the noise entering through $W_0$.\\

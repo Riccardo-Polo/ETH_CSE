@@ -1,0 +1,753 @@
+\section{Main concepts}
+
+Before studying constrained MPC in full generality, it is useful to introduce the basic language of mathematical optimization. Indeed, at each sampling instant MPC computes the control action by solving an optimization problem over a finite horizon. In the simplest linear setting, this problem has the form
+\[
+\min_{U_k}\;\sum_{i=0}^{N-1}\ell(x_{k+i},u_{k+i})
+\]
+subject to the prediction model, the initial condition, and the state and input constraints. The present chapter abstracts away from the specific control setting and introduces the optimization concepts that will later be needed in a more systematic way.\\
+A general optimization problem can be written as
+\[
+\min_{x \in \operatorname{dom}(f)} f(x)
+\]
+subject to
+\[
+g_i(x)\le 0,\qquad i=1,\dots,m,
+\]
+and
+\[
+h_i(x)=0,\qquad i=1,\dots,p.
+\]
+Here, \(x\in\R^n\) denotes the decision variable, \(f\) is the objective function, the functions \(g_i\) represent inequality constraints, and the functions \(h_i\) represent equality constraints. The set of all admissible decisions is called the \emph{feasible set}:
+\[
+\cX := \bigl\{x\in \operatorname{dom}(f)\mid g_i(x)\le 0,\ i=1,\dots,m,\ h_i(x)=0,\ i=1,\dots,p\bigr\}.
+\]
+A point \(x\in\cX\) is called \emph{feasible}. If, in addition, all inequality constraints are satisfied strictly, that is,
+\[
+g_i(x)<0,\qquad i=1,\dots,m,
+\]
+then \(x\) is called \emph{strictly feasible}. The smallest achievable value of the objective over the feasible set is called the \emph{optimal value} and is denoted by
+\[
+p^\star := \min_{x\in \cX} f(x).
+\]
+Any feasible point \(x^\star\) achieving this value is called an \emph{optimizer}. In general, the optimizer need not be unique, and one writes
+\[
+\argmin_{x\in \cX} f(x)
+\]
+for the set of all optimal solutions.\\
+
+It is also important to distinguish between local and global optimality. A feasible point \(x\in\cX\) is said to be \emph{locally optimal} if for some $R>0$ it satifies
+$$y \in \mathcal{X} \, , \, \norm{y-x} \leq R \Rightarrow f(y) \geq f(x) $$
+i.e. if it minimizes the objective in a neighborhood of itself. \\
+Whereas it is \emph{globally optimal} if it satifies
+$$y \in \mathcal{X} \Rightarrow f(y) \geq f(x) $$
+i.e. ifit minimizes the objective over the entire feasible set.\\
+For a general nonconvex problem, these two notions are very different. One of the main reasons convex optimization is so useful is that, under convexity assumptions, every local optimum is automatically global.\\
+
+Several pathological situations may also occur. If the feasible set is empty, then the problem is called \emph{infeasible} and by convention we say that $p^\star = \infty$. If feasible points exist but the objective can be made arbitrarily small (i.e. $p^\star = -\infty$), then the problem is \emph{unbounded below}. Finally, if there are no constraints at all ($\mathcal{X} = \R^n$), the problem is called \emph{unconstrained}.\\
+
+A further piece of terminology that will later be useful concerns the status of constraints at a given feasible point. An inequality constraint \(g_i(x)\le 0\) is said to be \emph{active} at \(\bar x\) if
+\[
+g_i(\bar x)=0,
+\]
+and \emph{inactive} otherwise. Equality constraints are always active, since they must hold exactly. A constraint is called \emph{redundant} if removing it does not change the feasible set. In that case it has no effect on the solution of the problem.
+
+\section{Convex sets}
+
+The first geometric concept underlying convex optimization is convexity of sets. A set \(\cX\subseteq \R^n\) is called \emph{convex} if, by definition, for every pair of points \(x,y\in\cX\) and every scalar \(\lambda\in[0,1]\), the convex combination
+\[
+\lambda x + (1-\lambda)y
+\]
+also belongs to \(\cX\). In words, this means that whenever two points lie in the set, the entire line segment joining them also lies in the set.\\
+
+This property is fundamental because it excludes holes, inward dents, and disconnected geometries that would make optimization much harder. Convexity of the feasible region is one of the key reasons why convex optimization problems are tractable and why local information is often sufficient to identify global solutions.
+More generally, given points \(x_1,\dots,x_k\in\R^n\), any point of the form
+\[
+x = \theta_1 x_1 + \theta_2 x_2 + \cdots + \theta_k x_k,
+\qquad
+\theta_i\ge 0,\quad \sum_{i=1}^k \theta_i = 1,
+\]
+is called a \emph{convex combination} of these points. A set is convex precisely when it contains all convex combinations of its points.\\
+Among the most important convex sets are hyperplanes and halfspaces. A hyperplane in \(\R^n\) is a set of the form
+\[
+\{x\in\R^n \mid a^\top x = b\},
+\]
+where \(a\neq 0\). Geometrically, \(a\) is normal to the hyperplane. A halfspace is one side of such a hyperplane, for example
+\[
+\{x\in\R^n \mid a^\top x \le b\}.
+\]
+Hyperplanes are affine sets, and halfspaces are convex sets. Since many constraints in control and optimization are linear inequalities or equalities, these objects appear constantly in MPC formulations.\\
+
+A particularly important class of convex sets is formed by \emph{polyhedra}, that is, intersections of finitely many closed halfspaces:
+\[
+  \{x\in\R^n \mid Ax \le b\}.
+\]
+If such a set is bounded, it is called a \emph{polytope}. In linear MPC, box constraints and more general linear inequality constraints lead exactly to feasible sets of this type.\\
+
+Another important family is given by ellipsoids. An ellipsoid centered at \(x_c\) can be written as
+\[
+\left\{x\in\R^n \,\middle|\, (x-x_c)^\top A^{-1}(x-x_c)\le 1\right\},
+\]
+where \(A\succ 0\). The positive definite matrix \(A\) determines the shape and orientation of the ellipsoid. The Euclidean ball is a special case obtained when \(A=r^2 I\).\\
+More generally, for any norm \(\|\cdot\|\), the norm ball
+\[
+\{x\in\R^n \mid \|x-x_c\|\le r\}
+\]
+is convex. Common examples are the \(\ell_2\)-ball, the \(\ell_1\)-ball, and the \(\ell_\infty\)-ball, corresponding respectively to the Euclidean norm, the sum of absolute values, and the maximum absolute component:
+\[
+\|x\|_2 = \left(\sum_i x_i^2\right)^{1/2},\qquad
+\|x\|_1 = \sum_i |x_i|,\qquad
+\|x\|_\infty = \max_i |x_i|.
+\]
+A basic operation that preserves convexity is intersection. If \(\cX_1,\cX_2,\dots\) are convex, then
+\[
+\bigcap_i \cX_i
+\]
+is again convex. This is extremely useful because many feasible regions are built by imposing several convex constraints simultaneously. By contrast, unions of convex sets are in general not convex. This explains why hybrid and mixed-integer problems are typically much harder than standard convex problems: they often involve feasible sets that are unions of several simpler regions rather than a single convex one.
+
+
+\section{Convex functions}
+
+The second central notion is convexity of functions. A function \(f:\operatorname{dom}(f)\to\R\) is called \emph{convex} if its domain is convex and if for all \(x,y\in\operatorname{dom}(f)\) and all \(\lambda\in[0,1]\),
+\[
+f(\lambda x + (1-\lambda)y)
+\le
+\lambda f(x) + (1-\lambda)f(y).
+\]
+Geometrically, this means that the graph of the function lies below the straight line segment joining any two points on the graph. If the inequality is strict whenever \(x\neq y\) and \(\lambda\in(0,1)\), then the function is called \emph{strictly convex}. A function is called \emph{concave} if its negative is convex.\\
+
+Convex objective functions are particularly important because they do not have spurious local minima. Their shape is globally well behaved, and this is one of the key reasons why optimization over them is reliable.\\
+
+For differentiable functions, convexity can be characterized through a first-order condition. A differentiable function \(f\) on a convex domain is convex if and only if
+\[
+f(y)\ge f(x) + \nabla f(x)^\top (y-x)
+\qquad
+\forall x,y\in\operatorname{dom}(f).
+\]
+Thus the first-order Taylor approximation of a convex function always lies below the function itself. In other words, each tangent hyperplane is a global underestimator.\\
+
+If \(f\) is twice differentiable, there is also a second-order characterization. The function is convex if and only if
+\[
+\nabla^2 f(x)\succeq 0
+\qquad
+\forall x\in\operatorname{dom}(f),
+\]
+that is, if its Hessian is positive semidefinite everywhere. If
+\[
+\nabla^2 f(x)\succ 0
+\qquad
+\forall x\in\operatorname{dom}(f),
+\]
+then \(f\) is strictly convex.\\
+
+A useful geometric notion associated with a function is that of a level set. For a scalar \(\alpha\), the level set is
+\[
+L_\alpha := \{x\in\operatorname{dom}(f)\mid f(x)=\alpha\},
+\]
+while the sublevel set is
+\[
+C_\alpha := \{x\in\operatorname{dom}(f)\mid f(x)\le \alpha\}.
+\]
+If \(f\) is convex, then every sublevel set \(C_\alpha\) is convex. This property is very important in optimization because it gives geometric information about the shape of cost contours.\\
+
+Typical examples of convex functions include affine functions, exponentials, powers \(x^\alpha\) on \(\R_{++}\) for suitable exponents, and vector norms. Typical concave functions include the logarithm on \(\R_{++}\) and certain entropy-type expressions. In control and estimation, quadratic functions occupy a particularly prominent role.\\
+ A quadratic function
+\[
+f(x)=\frac12 x^\top Hx + q^\top x + r
+\]
+is convex when \(H\succeq 0\), and strictly convex when \(H\succ 0\).\\
+
+Convexity is also preserved under several useful operations. Nonnegative weighted sums of convex functions remain convex, composition with affine maps preserves convexity, pointwise maxima of convex functions are convex, and partial minimization often preserves convexity as well. These rules make it possible to construct fairly rich objective and constraint functions while retaining tractability.
+
+\section{Convex optimization problems}
+
+We now combine convex sets and convex functions. A problem is called a \emph{convex optimization problem} if it can be written in the form
+\[
+\min_{x\in\operatorname{dom}(f)} f(x)
+\]
+subject to
+\[
+g_i(x)\le 0,\qquad i=1,\dots,m,
+\]
+and
+\[
+a_i^\top x = b_i,\qquad i=1,\dots,p,
+\]
+where \(f\) and the \(g_i\) are convex functions, the domain of \(f\) is convex, and the equality constraints are affine.\\
+The affine equalities are often collected in matrix form as
+\[
+Ax=b.
+\]
+Because sublevel sets of convex functions are convex, and because affine equality constraints define affine sets, the feasible set of a convex optimization problem is itself convex. This structural property is the source of the remarkable behavior of convex programs.\\
+
+The most important consequence is the following: every locally optimal solution of a convex optimization problem is also globally optimal. This completely changes the nature of optimization. For a general nonconvex problem one may find many local minima and must still ask whether any of them is globally best. In a convex problem, once a local minimizer has been found, the global problem is solved.\\
+This observation explains why convex optimization occupies such a central place in control. Convex problems can often be solved efficiently and reliably by numerical algorithms, and they offer strong guarantees that are usually unavailable in more general settings.\\
+
+Two convex problem classes are of particular importance.
+
+\subsection{Linear programs}
+
+A \emph{linear program} (LP) has the form
+\[
+\min_{x\in\R^n} c^\top x
+\]
+subject to
+\[
+Gx\le h,\qquad Ax=b.
+\]
+Here both the cost and the constraints are affine. The feasible set is therefore a polyhedron. If this set is empty, the problem is infeasible. If the cost can decrease indefinitely along a feasible direction, the problem is unbounded below. Otherwise the problem has a finite optimal value.\\
+Geometrically, an LP amounts to minimizing a linear function over a polyhedron. Since level sets of the objective are hyperplanes, the optimizer is obtained by shifting these hyperplanes until they first touch the feasible region. This immediately explains why optimal solutions often lie on the boundary, and in many cases at extreme points of the feasible polyhedron.\\
+LPs play an important role in MPC whenever the cost is linear or whenever a problem can be reformulated in linear form by introducing auxiliary variables. Moreover, more complicated problems are often compared against LPs because linear programs are among the most tractable optimization problems.
+
+\subsection{Quadratic programs}
+
+A \emph{quadratic program} (QP) has the form
+\[
+\min_{x\in\R^n}\; \frac12 x^\top Hx + q^\top x + r
+\]
+subject to
+\[
+Gx\le h,\qquad Ax=b.
+\]
+The constant term \(r\) has no effect on the optimizer and may often be omitted. The problem is convex if \(H\succeq 0\), and strictly convex if \(H\succ 0\).\\
+Quadratic programs are especially important for MPC because linear prediction models together with quadratic stage and terminal costs naturally lead to QPs. In this sense, the finite-horizon control problems encountered later in nominal MPC are not arbitrary optimization problems: they are structured convex quadratic programs.\\
+If the unconstrained minimizer of the quadratic objective happens to lie in the feasible set, then it is also the constrained optimizer. Otherwise the optimizer lies on the boundary of the feasible region, where the constraints interact with the curvature of the cost function. This interplay between a quadratic objective and linear constraints is exactly what gives QPs their characteristic structure.
+
+\subsection{Equivalent problem formulations}
+
+It is often useful to reformulate optimization problems without changing their essential content. Two formulations are called equivalent if the solution of one can be easily recovered from the solution of the other.\\
+
+One common trick is to introduce auxiliary equality constraints. For example, a composite problem such as
+\[
+\min_x f(A_0x+b_0)
+\qquad\text{subject to}\qquad
+g_i(A_ix+b_i)\le 0
+\]
+can be rewritten by introducing new variables \(y_i\) and imposing
+\[
+A_i x + b_i = y_i.
+\]
+Another standard device is the use of slack variables. A linear inequality
+\[
+A_i x \le b_i
+\]
+can be rewritten as
+\[
+A_i x + s_i = b_i,\qquad s_i\ge 0.
+\]
+Such reformulations are extremely common in optimization algorithms and in the derivation of dual problems.
+
+\section{Optimality conditions}
+
+The final step is to understand how one certifies optimality. For this, the central tool is the Lagrangian.
+
+\subsection{The Lagrangian and the dual problem}
+
+Consider again the general problem
+\[
+\min_{x\in\operatorname{dom}(f)} f(x)
+\]
+subject to
+\[
+g_i(x)\le 0,\qquad i=1,\dots,m,
+\]
+and
+\[
+h_i(x)=0,\qquad i=1,\dots,p.
+\]
+Its Lagrangian is defined by
+\[
+L(x,\lambda,\nu)
+=
+f(x)
++
+\sum_{i=1}^m \lambda_i g_i(x)
++
+\sum_{i=1}^p \nu_i h_i(x),
+\]
+where \(\lambda_i\) are the multipliers associated with the inequality constraints and \(\nu_i\) those associated with the equality constraints. Since the inequalities must be penalized only when they are violated, the multipliers \(\lambda_i\) are required to satisfy
+\[
+\lambda_i \ge 0.
+\]
+The associated \emph{dual function} is
+\[
+d(\lambda,\nu)
+:=
+\inf_{x\in\operatorname{dom}(f)} L(x,\lambda,\nu).
+\]
+This function is always concave in \((\lambda,\nu)\), even if the primal problem itself is not convex. Moreover, whenever \(\lambda\ge 0\), the dual function provides a lower bound on the primal optimal value:
+\[
+d(\lambda,\nu)\le p^\star.
+\]
+This is the principle of \emph{weak duality}.\\
+Maximizing this lower bound leads to the \emph{dual problem}:
+\[
+\max_{\lambda,\nu}\ d(\lambda,\nu)
+\qquad\text{subject to}\qquad
+\lambda\ge 0.
+\]
+If the optimal value of the dual problem is denoted by \(d^\star\), weak duality states that
+\[
+d^\star \le p^\star.
+\]
+For linear and quadratic programs, the dual often has a particularly simple form. In fact, the dual of an LP is again an LP, and the dual of a convex QP is again a QP. This is not only mathematically elegant but also practically useful, because sometimes the dual problem is easier to solve or interpret than the primal one.
+
+\subsection{Examples: dual of an LP and of a QP}
+
+It is useful to make the previous discussion concrete by deriving the dual explicitly for two
+important problem classes.
+
+\subsubsection{Example: dual of a linear program}
+
+Consider the linear program
+\[
+\begin{aligned}
+(P):\qquad
+\min_{x\in\R^n}\;& c^\top x\\
+\text{subj. to}\;& Ax=b,\\
+& Cx\le e.
+\end{aligned}
+\]
+Its Lagrangian is
+\[
+L(x,\lambda,\nu)
+=
+c^\top x+\nu^\top(Ax-b)+\lambda^\top(Cx-e),
+\]
+where \(\nu\) is associated with the equality constraint and \(\lambda\ge 0\) with the inequality
+constraint. Rearranging terms gives
+\[
+L(x,\lambda,\nu)
+=
+\bigl(A^\top \nu + C^\top \lambda + c\bigr)^\top x
+-
+b^\top \nu
+-
+e^\top \lambda.
+\]
+Hence the dual function is
+\[
+d(\lambda,\nu)
+=
+\inf_{x\in\R^n} L(x,\lambda,\nu)
+=
+\inf_{x\in\R^n}
+\left[
+\bigl(A^\top \nu + C^\top \lambda + c\bigr)^\top x
+-
+b^\top \nu
+-
+e^\top \lambda
+\right].
+\]
+Now, if
+\[
+A^\top \nu + C^\top \lambda + c \neq 0,
+\]
+then the expression is affine and nonconstant in \(x\), so its infimum is \(-\infty\). Therefore,
+for the dual function to be finite one must impose
+\[
+A^\top \nu + C^\top \lambda + c = 0.
+\]
+Under this condition, the term depending on \(x\) disappears and one obtains
+\[
+d(\lambda,\nu) = -\,b^\top \nu - e^\top \lambda.
+\]
+Thus the dual problem is
+\[
+\begin{aligned}
+(D):\qquad
+\max_{\lambda,\nu}\;& -\,b^\top \nu - e^\top \lambda\\
+\text{subj. to}\;& A^\top \nu + C^\top \lambda + c = 0,\\
+& \lambda \ge 0.
+\end{aligned}
+\]
+This confirms an important structural fact: the dual of a linear program is again a linear
+program.
+
+\subsubsection{Example: dual of a quadratic program}
+
+Now consider the quadratic program
+\[
+\begin{aligned}
+(P):\qquad
+\min_{x\in\R^n}\;& \frac12 x^\top Qx + c^\top x\\
+\text{subj. to}\;& Cx\le e,
+\end{aligned}
+\]
+where \(Q\succ 0\). Its Lagrangian is
+\[
+L(x,\lambda)
+=
+\frac12 x^\top Qx + c^\top x + \lambda^\top(Cx-e),
+\qquad \lambda\ge 0.
+\]
+Collecting terms yields
+\[
+L(x,\lambda)
+=
+\frac12 x^\top Qx + \bigl(c + C^\top\lambda\bigr)^\top x - e^\top \lambda.
+\]
+The dual function is therefore
+\[
+d(\lambda)
+=
+\inf_{x\in\R^n}
+\left[
+\frac12 x^\top Qx + \bigl(c + C^\top\lambda\bigr)^\top x - e^\top \lambda
+\right].
+\]
+Since \(Q\succ 0\), the minimization over \(x\) is unconstrained and strictly convex, so the
+minimizer is obtained from the stationarity condition
+\[
+Qx + c + C^\top \lambda = 0.
+\]
+Hence
+\[
+x^\star(\lambda) = -Q^{-1}(c + C^\top \lambda).
+\]
+Substituting this expression into the dual function gives
+\[
+d(\lambda)
+=
+-\frac12
+\bigl(c + C^\top \lambda\bigr)^\top
+Q^{-1}
+\bigl(c + C^\top \lambda\bigr)
+-
+e^\top \lambda.
+\]
+The dual problem is therefore
+\[
+\max_{\lambda\ge 0}\;
+-\frac12
+\bigl(c + C^\top \lambda\bigr)^\top
+Q^{-1}
+\bigl(c + C^\top \lambda\bigr)
+-
+e^\top \lambda.
+\]
+Equivalently, by multiplying the objective by \(-1\), one can write it in minimization form as
+\[
+\begin{aligned}
+(D):\qquad
+\min_{\lambda}\;&
+\frac12 \lambda^\top C Q^{-1} C^\top \lambda
++
+\bigl(CQ^{-1}c + e\bigr)^\top \lambda
++
+\frac12 c^\top Q^{-1} c\\
+\text{subj. to}\;& \lambda\ge 0.
+\end{aligned}
+\]
+Thus the dual of a convex quadratic program is again a quadratic program.
+
+These two examples illustrate why duality is so useful in practice. For structured problems such
+as LPs and QPs, the dual preserves the general problem class, while at the same time providing
+lower bounds, optimality certificates, and sensitivity information through the associated
+multipliers.
+
+\subsection{Strong duality and Slater's condition}
+
+Weak duality always holds, but equality
+\[
+d^\star = p^\star
+\]
+is a stronger property called \emph{strong duality}. Strong duality does not hold in general for nonconvex problems. For convex problems, however, it often does hold under additional regularity assumptions.\\
+A particularly important sufficient condition is \emph{Slater's condition}. For a convex problem with affine equality constraints, Slater's condition requires the existence of a strictly feasible point satisfying all equalities and strictly satisfying all inequalities, i.e.
+$$\{ x | Ax = b , g(x_i) < 0 \, \forall i \in \{1,\dots,m \} \} \not= \emptyset $$ 
+When this condition holds, strong duality follows:
+\[
+p^\star = d^\star.
+\]
+This result is fundamental, because it means that the dual problem is not merely producing lower bounds; it is producing the exact optimal value. It is also the basis for the Karush--Kuhn--Tucker conditions.
+
+\subsection{Karush--Kuhn--Tucker conditions}
+
+Assume that \(f\), all \(g_i\), and all \(h_i\) are differentiable. The \emph{Karush--Kuhn--Tucker} (KKT) conditions are:
+
+\begin{align*}
+&\text{1) Primal feasibility:} \\
+&\qquad g_i(x^\star)\le 0, \qquad i=1,\dots,m,\\
+&\qquad h_i(x^\star)=0, \qquad i=1,\dots,p,\\[0.5em]
+&\text{2) Dual feasibility:} \\
+&\qquad \lambda^\star \ge 0,\\[0.5em]
+&\text{3) Complementary slackness:} \\
+&\qquad \lambda_i^\star g_i(x^\star)=0,\qquad i=1,\dots,m,\\[0.5em]
+&\text{4) Stationarity:} \\
+&\qquad \nabla_x L(x^\star,\lambda^\star,\nu^\star)
+=
+\nabla f(x^\star)
++
+\sum_{i=1}^m \lambda_i^\star \nabla g_i(x^\star)
++
+\sum_{i=1}^p \nu_i^\star \nabla h_i(x^\star)
+=0.
+\end{align*}
+These four groups of conditions play different roles. Primal feasibility requires that the candidate solution \(x^\star\) satisfy the original constraints. Dual feasibility requires nonnegativity of the multipliers associated with the inequality constraints. Complementary slackness links the primal and dual solutions, while stationarity states that at the optimum the gradient of the Lagrangian with respect to the primal variable must vanish.
+
+\subsubsection{Notes on complementary slackness}
+
+Complementary slackness is one of the most characteristic parts of the KKT conditions. Assume that strong duality holds, and let \(x^\star\) and \((\lambda^\star,\nu^\star)\) be primal and dual optimal solutions. Then
+\[
+d^\star = p^\star
+\qquad\Longrightarrow\qquad
+d(\lambda^\star,\nu^\star)=f(x^\star).
+\]
+From the definition of the dual function,
+\[
+d(\lambda^\star,\nu^\star)
+=
+\inf_x
+\left(
+f(x)
++
+\sum_{i=1}^m \lambda_i^\star g_i(x)
++
+\sum_{i=1}^p \nu_i^\star h_i(x)
+\right).
+\]
+Evaluating the expression at \(x=x^\star\) gives
+\[
+d(\lambda^\star,\nu^\star)
+\le
+f(x^\star)
++
+\sum_{i=1}^m \lambda_i^\star g_i(x^\star)
++
+\sum_{i=1}^p \nu_i^\star h_i(x^\star).
+\]
+Since \(x^\star\) is primal feasible, \(h_i(x^\star)=0\) and \(g_i(x^\star)\le 0\), while \(\lambda_i^\star\ge 0\). Therefore
+\[
+f(x^\star)
++
+\sum_{i=1}^m \lambda_i^\star g_i(x^\star)
++
+\sum_{i=1}^p \nu_i^\star h_i(x^\star)
+\le f(x^\star).
+\]
+Combining the two inequalities with \(d(\lambda^\star,\nu^\star)=f(x^\star)\) yields
+\[
+f(x^\star)
+=
+f(x^\star)
++
+\sum_{i=1}^m \lambda_i^\star g_i(x^\star),
+\]
+and hence
+\[
+\lambda_i^\star g_i(x^\star)=0,
+\qquad i=1,\dots,m.
+\]
+This means that for every inequality constraint, one of the following must happen:
+\[
+g_i(x^\star)<0 \;\Longrightarrow\; \lambda_i^\star=0,
+\]
+or
+\[
+\lambda_i^\star>0 \;\Longrightarrow\; g_i(x^\star)=0.
+\]
+So a strictly inactive inequality must have zero multiplier, while a strictly positive multiplier identifies an active constraint.
+
+\subsubsection{When are the KKT conditions necessary or sufficient?}
+
+For a general optimization problem, the KKT conditions are in general only a \emph{necessary} condition under suitable assumptions. In other words, if \(x^\star\) and \((\lambda^\star,\nu^\star)\) are primal and dual optimal solutions and strong duality holds, then they satisfy the KKT conditions.\\
+
+For a convex optimization problem satisfying Slater's condition, the situation is much stronger: the KKT conditions become \emph{necessary and sufficient}. Thus, if Slater's condition holds, then \(x^\star\) and \((\lambda^\star,\nu^\star)\) are primal and dual optimal if and only if they satisfy the KKT conditions.
+
+\begin{theorembox}[KKT conditions for convex problems]
+For a convex optimization problem, KKT conditions provide a complete characterization of optimality once Slater's condition holds. In that case, checking optimality is equivalent to checking primal feasibility, dual feasibility, complementary slackness, and stationarity.
+\end{theorembox}
+
+\subsection{Example: KKT conditions for a quadratic program}
+
+Consider the convex quadratic program
+\[
+\begin{aligned}
+(P):\qquad
+\min_{x\in\R^n}\;& \frac12 x^\top Qx + c^\top x\\
+\text{subj. to}\;& Ax=b,\\
+& x\ge 0,
+\end{aligned}
+\]
+with \(Q\succeq 0\).\\
+Its Lagrangian is
+\[
+L(x,\lambda,\nu)
+=
+\frac12 x^\top Qx + c^\top x + \nu^\top(Ax-b) - \lambda^\top x.
+\]
+The KKT conditions are then:
+
+\begin{align*}
+&\text{Stationarity:} 
+&& Qx + A^\top \nu - \lambda + c = 0,\\
+&\text{Primal feasibility:} 
+&& Ax=b,\\
+&\text{Primal feasibility:} 
+&& x\ge 0,\\
+&\text{Dual feasibility:} 
+&& \lambda\ge 0,\\
+&\text{Complementarity:} 
+&& x_i\lambda_i = 0,\qquad i=1,\dots,n.
+\end{align*}
+
+The last three conditions are often written compactly as
+\[
+0 \le x \perp \lambda \ge 0.
+\]
+This notation emphasizes that \(x\) and \(\lambda\) are both componentwise nonnegative and orthogonal component by component, which is exactly the complementarity relation.
+
+\subsection{Sensitivity analysis}
+
+The dual variables are not only useful for deriving optimality conditions. They also carry
+important information about how the optimal cost changes when the constraints of the primal
+problem are perturbed.\\
+Consider the optimization problem
+\[
+\begin{aligned}
+\min_x \;& f(x)\\
+\text{subj. to}\;& g_i(x)\le 0,\qquad i=1,\dots,m,\\
+& h_i(x)=0,\qquad i=1,\dots,p,
+\end{aligned}
+\]
+together with its dual
+\[
+\begin{aligned}
+\max_{\nu,\lambda}\;& d(\nu,\lambda)\\
+\text{subj. to}\;& \lambda\ge 0.
+\end{aligned}
+\]
+Now perturb the constraints and consider instead
+\[
+\begin{aligned}
+\min_x \;& f(x)\\
+\text{subj. to}\;& g_i(x)\le u_i,\qquad i=1,\dots,m,\\
+& h_i(x)=v_i,\qquad i=1,\dots,p,
+\end{aligned}
+\]
+where \(u\) and \(v\) represent perturbations of the inequality and equality constraints,
+respectively. The corresponding dual problem becomes
+\[
+\begin{aligned}
+\max_{\nu,\lambda}\;& d(\nu,\lambda)-u^\top\lambda-v^\top\nu\\
+\text{subj. to}\;& \lambda\ge 0.
+\end{aligned}
+\]
+Here, \(x\) is the primal decision variable, \((\lambda,\nu)\) are the dual decision variables,
+and the optimal value of the perturbed primal problem is denoted by
+\[
+p^\star(u,v).
+\]
+
+\subsubsection{Global sensitivity analysis}
+
+Assume strong duality for the unperturbed problem, and let \((\nu^\star,\lambda^\star)\) be dual
+optimal. Then weak duality for the perturbed problem implies
+\[
+p^\star(u,v)
+\ge
+d^\star(\nu^\star,\lambda^\star)-u^\top\lambda^\star-v^\top\nu^\star
+=
+p^\star(0,0)-u^\top\lambda^\star-v^\top\nu^\star.
+\]
+This gives a lower bound on the perturbed optimal value in terms of the optimal multipliers of
+the unperturbed problem.\\
+The interpretation is immediate. If \(\lambda_i^\star\) is large and \(u_i<0\), then the \(i\)-th
+inequality constraint is tightened and the lower bound increases significantly. This indicates
+that the optimal cost \(p^\star(u,v)\) is likely to increase substantially. By contrast, if
+\(\lambda_i^\star\) is small and \(u_i>0\), then relaxing the constraint does not reduce the lower
+bound by much, so the gain in optimal performance is expected to be limited.\\
+
+A similar interpretation applies to the equality multipliers \(\nu_i^\star\). If \(\nu_i^\star\) is
+large and positive, then a perturbation \(v_i<0\) tends to increase the optimal cost strongly.
+If \(\nu_i^\star\) is large and negative, then a perturbation \(v_i>0\) has the same effect.
+Conversely, if \(\nu_i^\star\) is small in magnitude, the corresponding perturbations typically do
+not change the optimal value very much.\\
+
+It is important to keep in mind that this result is not symmetric: it provides only a lower bound
+on \(p^\star(u,v)\), not an exact formula.
+
+\subsubsection{Local sensitivity analysis}
+
+A sharper interpretation is available when the perturbed value function is differentiable at the
+origin. If \(p^\star(u,v)\) is differentiable at \((u,v)=(0,0)\), then the optimal multipliers are
+precisely the local sensitivities of the optimal value:
+\[
+\lambda_i^\star = -\frac{\partial p^\star(0,0)}{\partial u_i},
+\qquad
+\nu_i^\star = -\frac{\partial p^\star(0,0)}{\partial v_i}.
+\]
+Thus \(\lambda_i^\star\) measures the sensitivity of the optimal cost with respect to the
+\(i\)-th inequality constraint, and \(\nu_i^\star\) measures the sensitivity with respect to the
+\(i\)-th equality constraint.\\
+This gives a very useful interpretation of Lagrange multipliers. They are not just auxiliary
+variables introduced for duality theory, but quantitative indicators of how costly it is to tighten
+constraints. In particular, a large multiplier means that even a small tightening may produce a
+significant increase in the optimal value.\\
+
+In MPC this viewpoint is especially natural. Constraints on states and inputs often reflect
+physical or safety limitations, and the associated multipliers indicate how strongly these
+limitations influence achievable performance.
+
+\section{Summary}
+
+We can now summarize the main ideas of this chapter. A convex optimization problem is
+characterized by a convex objective function, convex inequality constraints, and affine equality
+constraints. This structure implies that the feasible set is convex and, most importantly, that
+local optimality coincides with global optimality.\\
+
+This is the central benefit of convex optimization: one does not need to search among many
+different local minima, since any local minimum is already globally optimal. As a consequence,
+convex problems can often be solved efficiently and reliably, which is one of the main reasons
+they play such an important role in control.\\
+Among the most relevant special cases are linear programs and quadratic programs. Linear
+programs combine affine objectives with polyhedral feasible sets, while quadratic programs add
+a convex quadratic cost. Since many finite-horizon optimal control problems with linear dynamics
+and quadratic costs can be formulated as QPs, these problem classes are fundamental in MPC.\\
+We also saw that duality provides much more than an alternative mathematical formulation.
+The dual problem is always convex, even if the primal is not. It provides lower bounds on the
+primal optimal value, gives optimality certificates through the KKT conditions in the convex
+case, and plays a central role in optimization algorithms. Moreover, the optimal multipliers
+identify active constraints and quantify the sensitivity of the optimal cost to perturbations of
+the problem data.\\
+Altogether, duality, KKT conditions, and sensitivity analysis show that Lagrange multipliers
+have a rich interpretation: they are simultaneously certificates of optimality, indicators of active
+constraints, and local measures of the value of relaxing or tightening constraints.\\
+
+These ideas will reappear throughout MPC. In later chapters, finite-horizon constrained optimal
+control problems will be formulated as convex optimization problems, often as QPs, and the
+concepts developed here will become essential both for theoretical analysis and for numerical
+solution methods.
+
+\subsection*{Why did we consider the dual problem?}
+
+It is worth ending the chapter by emphasizing once more why the dual problem is so useful.\\
+
+First, the dual problem is convex even when the primal problem is not, so in some cases it may
+be easier to solve or analyze than the primal formulation.\\
+Second, the dual problem always provides a lower bound on the primal optimal value:
+\[
+d^\star \le p^\star,
+\]
+and more generally
+\[
+d(\lambda,\nu)\le p(x)
+\]
+for every primal feasible \(x\) and every dual feasible pair \((\lambda,\nu)\). This makes the dual
+valuable as a source of suboptimality bounds.\\
+Third, in convex optimization the dual provides a certificate of optimality through the KKT
+conditions. Once primal feasibility, dual feasibility, complementarity, and stationarity are
+verified, optimality is established.\\
+Fourth, the KKT conditions are not only theoretically elegant, but also form the basis of many
+efficient optimization algorithms.\\
+Finally, the multipliers themselves carry information that is directly meaningful. If
+\[
+\lambda_i^\star > 0,
+\]
+then the corresponding inequality constraint must be active at the optimum:
+\[
+g_i(x^\star)=0.
+\]
+And if \(\lambda_i^\star\) is large, then tightening that constraint tends to increase the optimal cost
+significantly. In this way, the dual variables encode both structural and sensitivity information
+about the primal problem.
