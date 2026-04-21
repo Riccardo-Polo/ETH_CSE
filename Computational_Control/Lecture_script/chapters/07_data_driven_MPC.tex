@@ -1,0 +1,980 @@
+Before moving to data-driven predictive control, it is useful to rewrite the input-output behavior of a linear system over a finite horizon in a compact lifted form. This representation will later allow us to reason directly in terms of trajectories collected from data.\\
+Consider the discrete-time linear system
+$$
+x_{t+1} = A x_t + B u_t, 
+\qquad
+y_t = C x_t,
+$$
+and fix a horizon length $L$. By recursively expanding the state dynamics, the output at time $t$ can be written as
+$$
+y_t = C A^t x_0 + \sum_{j=0}^{t-1} C A^{t-1-j} B u_j .
+$$
+This expression has two parts:
+\begin{itemize}
+    \item the \emph{free response} $C A^t x_0$, which depends only on the initial condition,
+    \item the \emph{forced response} (or convolution term), which depends on the past inputs.
+\end{itemize}
+
+\subsection{Lifted input--output representation}
+
+To simplify the notation, let us first focus on the SISO case, namely
+\[
+u_t \in \mathbb{R}, \qquad y_t \in \mathbb{R}.
+\]
+Stacking the outputs and inputs over a horizon of length $L$, define
+\[
+y_{[0,L-1]} :=
+\begin{bmatrix}
+y_0\\
+y_1\\
+y_2\\
+\vdots\\
+y_{L-1}
+\end{bmatrix},
+\qquad
+u_{[0,L-1]} :=
+\begin{bmatrix}
+u_0\\
+u_1\\
+u_2\\
+\vdots\\
+u_{L-1}
+\end{bmatrix}.
+\]
+Then the finite-horizon input--output relation becomes
+\begin{equation}
+\label{eq:lifted_io}
+y_{[0,L-1]} = \mathcal{O}_L x_0 + \mathcal{G}_L u_{[0,L-1]},
+\end{equation}
+where
+$$
+\mathcal{O}_L :=
+\begin{bmatrix}
+C\\
+CA\\
+CA^2\\
+\vdots\\
+CA^{L-1}
+\end{bmatrix}
+\in \mathbb{R}^{L \times n}
+$$
+is the \emph{extended observability matrix}, and
+$$
+\mathcal{G}_L :=
+\begin{bmatrix}
+0 & 0 & 0 & \cdots & 0\\
+CB & 0 & 0 & \cdots & 0\\
+CAB & CB & 0 & \cdots & 0\\
+\vdots & \vdots & \ddots & \ddots & \vdots\\
+CA^{L-2}B & CA^{L-3}B & \cdots & CB & 0
+\end{bmatrix}
+\in \mathbb{R}^{L \times L}
+$$
+is the \emph{convolution matrix}.\\
+Equation~\eqref{eq:lifted_io} is important because it separates clearly the role of the initial condition from the role of the input sequence. The term $\mathcal{O}_L x_0$ describes all outputs that can be generated with zero input, while $\mathcal{G}_L u_{[0,L-1]}$ captures how the applied inputs shape the trajectory.
+
+\subsection{Free response and observability}
+
+If we set the input to zero, then only the free response remains:
+%\begin{equation}
+%\label{eq:free_response}
+$$
+y_{[0,L-1]} = \mathcal{O}_L x_0
+$$
+%\end{equation}
+This is exactly the finite-horizon observability relation. It tells us that reconstructing the initial state from an output sequence is equivalent to solving a linear system with matrix $\mathcal{O}_L$.\\
+
+Assume now that the system is observable. In the SISO case this means that, for a sufficiently large horizon, the matrix $\mathcal{O}_L$ has full column rank:
+\[
+\text{rank}(\mathcal{O}_L)=n,
+\]
+where $n$ is the state dimension.\\
+The consequences are immediate:
+\begin{itemize}
+    \item if $L<n$, then $\mathcal{O}_L$ has fewer rows than columns, so in general there is not enough information to reconstruct $x_0$ uniquely;
+    \item if $L=n$ and $\mathcal{O}_n$ is invertible, then $x_0$ can be reconstructed uniquely as
+    \[
+    x_0 = \mathcal{O}_n^{-1} y_{[0,n-1]};
+    \]
+    \item if $L>n$, then the problem is overdetermined: if the measured output sequence is consistent with the model, then $x_0$ can still be reconstructed uniquely, but not every arbitrary sequence $y_{[0,L-1]}$ is valid.
+\end{itemize}
+So for $L>n$ the image of $\mathcal{O}_L$ contains exactly the output sequences that can arise as free responses of the system. This point is fundamental: model-consistent trajectories do not fill the whole space $\mathbb{R}^L$, but only an $n$-dimensional subspace.
+
+\subsubsection{Example: scalar system}
+
+Consider now the scalar system
+$$
+x_{t+1} = \frac{1}{2}x_t + u_t,
+\qquad
+y_t = x_t,
+$$
+for which the state dimension is $n=1$. Since $C=1$ and $A=\frac12$, the extended observability matrix is
+\begin{equation*}
+\mathcal{O}_L =
+\begin{bmatrix}
+1\\[2mm]
+\frac12\\[2mm]
+\frac14\\
+\vdots\\
+\left(\frac12\right)^{L-1}
+\end{bmatrix}.
+\end{equation*}
+Assume there is no input, so that $u_t=0$ for all $t$. Then the free response is simply
+\begin{equation*}
+y_t = \left(\frac12\right)^t x_0.
+\end{equation*}
+Hence the whole output sequence is completely determined by the single scalar $x_0$.
+
+\paragraph{Can we reconstruct $x_0$ from $y_0=1$?}
+Yes. Since $y_0=x_0$, we immediately obtain
+\[
+x_0 = 1
+\]
+
+\paragraph{Can we reconstruct $x_0$ from $y_0=2$, $y_1=1$?}
+Yes. From the first measurement we get $x_0=2$. The second measurement is consistent with the model because
+\[
+y_1 = \frac12 x_0 = \frac12 \cdot 2 = 1.
+\]
+So the sequence is valid, and the reconstructed initial state is
+\[
+x_0=2.
+\]
+
+\paragraph{Can we reconstruct $x_0$ from $y_0=1$, $y_1=1$?}
+No. The first measurement implies $x_0=1$, but then the model predicts
+\[
+y_1 = \frac12 x_0 = \frac12,
+\]
+which is not equal to the given value $1$. Therefore the pair $(y_0,y_1)=(1,1)$ is \emph{not} a valid free-response trajectory of this system. In other words, there exists no initial state $x_0$ that generates this sequence with zero input.
+
+\paragraph{What are all output sequences produced by the free response?}
+All valid free-response output sequences are exactly those of the form
+\begin{equation*}
+y_t = \left(\frac12\right)^t x_0, \qquad t=0,1,\dots,L-1,
+\end{equation*}
+for some scalar $x_0 \in \mathbb{R}$. Equivalently, they are the sequences satisfying the recursion
+\[
+y_{t+1} = \frac12 y_t,
+\]
+and they form the one-dimensional subspace
+\[
+\mathrm{im}(\mathcal{O}_L)
+=
+\left\{
+\begin{bmatrix}
+1\\[1mm]
+\frac12\\[1mm]
+\frac14\\
+\vdots\\
+\left(\frac12\right)^{L-1}
+\end{bmatrix}
+x_0
+:\; x_0 \in \mathbb{R}
+\right\}.
+\]
+This example illustrates a general fact that will be crucial later on: trajectories generated by a dynamical system are highly structured. Even when we only look at input--output data over a finite horizon, the admissible sequences belong to low-dimensional subspaces determined by the system dynamics. Data-driven predictive control exploits exactly this structure, but without explicitly identifying the matrices $A$, $B$, and $C$ first.
+
+\subsection{Known input sequence and state reconstruction}
+
+Let us now move to the more general case in which the input sequence is not zero, but it is known. Starting from the lifted input--output relation
+\[
+y_{[0,L-1]} = \mathcal{O}_L x_0 + \mathcal{G}_L u_{[0,L-1]},
+\]
+we can ask again the same question as before: can we reconstruct the initial state $x_0$ from measured inputs and outputs?\\
+Since the input sequence is assumed to be known, the term $\mathcal{G}_L u_{[0,L-1]}$ is also known. Therefore we can subtract its contribution from the measured output sequence and obtain
+\[
+y_{[0,L-1]} - \mathcal{G}_L u_{[0,L-1]} = \mathcal{O}_L x_0.
+\]
+This is exactly the same reconstruction problem as in the zero-input case, except that now the measured outputs must first be corrected by removing the forced response generated by the known input sequence.\\
+
+So the answer to the question \emph{``Can you determine $x_0$?''} is: yes, provided that the corrected output sequence
+\[
+y_{[0,L-1]} - \mathcal{G}_L u_{[0,L-1]}
+\]
+belongs to the column image of $\mathcal{O}_L$. Equivalently, there must exist an initial condition $x_0$ such that
+\[
+\mathcal{O}_L x_0 = y_{[0,L-1]} - \mathcal{G}_L u_{[0,L-1]}.
+\]
+Just as before, the horizon length $L$ relative to the state dimension $n$ determines whether the problem is underdetermined, exactly determined, or overdetermined:
+\begin{itemize}
+    \item if $L<n$, then there are in general not enough equations to reconstruct $x_0$ uniquely;
+    \item if $L=n$ and $\mathcal{O}_n$ is invertible, then the initial state is uniquely given by
+    \[
+    x_0 = \mathcal{O}_n^{-1}\bigl(y_{[0,n-1]} - \mathcal{G}_n u_{[0,n-1]}\bigr);
+    \]
+    \item if $L>n$, then the problem is overdetermined: one can reconstruct $x_0$ only if the measured input--output sequence is compatible with the system dynamics.
+\end{itemize}
+This compatibility requirement is already an important message. For $L>n$, not every arbitrary pair of sequences $(u,y)$ can come from the system. Once the known input contribution is removed, the remaining part of the output must lie in an $n$-dimensional subspace. Hence admissible input--output trajectories are constrained by the dynamics, even if we do not write the state explicitly.
+
+\subsection{Behavioral description of finite-horizon trajectories}
+
+The lifted representation can be written in an even more compact form by stacking the input and output sequences together:
+\[
+\begin{bmatrix}
+u_{[0,L-1]}\\[1mm]
+y_{[0,L-1]}
+\end{bmatrix}
+=
+\begin{bmatrix}
+I_L & 0\\
+\mathcal{G}_L & \mathcal{O}_L
+\end{bmatrix}
+\begin{bmatrix}
+u_{[0,L-1]}\\[1mm]
+x_0
+\end{bmatrix}.
+\]
+It is convenient to define the matrix
+\[
+\Lambda_L :=
+\begin{bmatrix}
+I_L & 0\\
+\mathcal{G}_L & \mathcal{O}_L
+\end{bmatrix}
+\in \mathbb{R}^{(L+L)\times (L+n)}.
+\]
+Then every trajectory of length $L$ generated by the system satisfies
+\[
+\begin{bmatrix}
+u_{[0,L-1]}\\[1mm]
+y_{[0,L-1]}
+\end{bmatrix}
+=
+\Lambda_L
+\begin{bmatrix}
+u_{[0,L-1]}\\[1mm]
+x_0
+\end{bmatrix}.
+\]
+This expression is extremely useful because it describes all system trajectories in one shot. The free variables are the initial state $x_0$ and the input sequence $u_{[0,L-1]}$; once they are fixed, the output sequence is uniquely determined.\\
+Observe also that, if $L\ge n$ and the system is observable, then $\mathcal{O}_L$ has rank $n$. Since the upper block contains the identity matrix $I_L$, it follows that
+\[
+\text{rank}(\Lambda_L)=L+n.
+\]
+So $\Lambda_L$ has full column rank, and its column image is an $(L+n)$-dimensional subspace of $\mathbb{R}^{2L}$.\\
+\subsubsection{Behavioral viewpoint}
+The previous construction leads naturally to the behavioral viewpoint. The key idea is to describe the system not primarily through states and equations, but through the set of all trajectories that are compatible with the dynamics.\\
+From the identity above, the admissible trajectories are exactly those vectors of the form
+\[
+\begin{bmatrix}
+u_{[0,L-1]}\\[1mm]
+y_{[0,L-1]}
+\end{bmatrix}
+\in \operatorname{im}(\Lambda_L).
+\]
+In other words, a pair of input and output sequences is feasible for the system if and only if it belongs to the column image of $\Lambda_L$.\\
+
+This is called a \emph{behavioral representation} of the system. Instead of saying that the system is described by the matrices $A$, $B$, and $C$, we may equivalently say that it is described by the set of all finite-horizon trajectories it can generate. The matrix $\Lambda_L$ is a complete description of this set, exactly in the same sense in which $(A,B,C)$ is a complete model description.\\
+This viewpoint has an important practical consequence. If we know $\Lambda_L$, then given any candidate input--output sequence we can immediately test whether it is compatible with the plant: compatibility means precisely that there exists some initial state $x_0$ such that the trajectory can be generated by the system. Equivalently,
+\[
+\begin{bmatrix}
+u_{[0,L-1]}\\[1mm]
+y_{[0,L-1]}
+\end{bmatrix}
+\text{ is admissible}
+\qquad\Longleftrightarrow\qquad
+\begin{bmatrix}
+u_{[0,L-1]}\\[1mm]
+y_{[0,L-1]}
+\end{bmatrix}
+\in \operatorname{im}(\Lambda_L).
+\]
+This perspective is central in behavioral system theory, developed by Jan C.\ Willems. The main philosophical shift is that one does not start by classifying variables as inputs, outputs, and states and then deriving trajectories. Instead, one starts directly from the set of all trajectories that the system can exhibit. The state-space model is then just one possible representation of that behavior.\\
+For our purposes, this is exactly the bridge toward data-driven predictive control. If the system can be characterized through its trajectory space, then in principle we may hope to learn and manipulate this space directly from measured data, without first identifying a parametric state-space model. This is the core idea behind the data-driven predictive control methods studied next.\\
+
+\subsubsection{Why the horizon $L=n+1$ is the first predictive horizon}
+A particularly important case is when the horizon length equals the state dimension, that is, $L=n$. In this case,
+\[
+\begin{bmatrix}
+u_{[0,n-1]}\\[1mm]
+y_{[0,n-1]}
+\end{bmatrix}
+=
+\underbrace{
+\begin{bmatrix}
+I_n & 0\\
+\mathcal{G}_n & \mathcal{O}_n
+\end{bmatrix}}_{\Lambda_n}
+\begin{bmatrix}
+u_{[0,n-1]}\\[1mm]
+x_0
+\end{bmatrix}.
+\]
+The matrix $\Lambda_n$ has dimension $2n\times 2n$. Since the system is observable, $\mathcal{O}_n$ has rank $n$, and therefore
+\[
+\operatorname{rank}(\Lambda_n)=2n.
+\]
+So $\Lambda_n$ is invertible. As a consequence, every input--output sequence of length $n$ can be uniquely explained by a suitable initial condition $x_0$. This is exactly the observability problem: once $n$ input--output samples are known, the initial state can be reconstructed.\\
+To see this in the simplest possible case, consider the scalar integrator
+\[
+x_{t+1}=x_t+u_t,
+\qquad
+y_t=x_t.
+\]
+Here $n=1$, so already from one output sample we get $x_0=y_0$. There is no additional compatibility condition yet: any pair $(u_0,y_0)$ can be explained by choosing $x_0=y_0$.\\
+Now let us increase the horizon to $L=n+1$. Then
+\[
+\begin{bmatrix}
+\colorbox{lightred}{$\displaystyle u_0$}\\
+\vdots\\
+\colorbox{lightred}{$\displaystyle u_{n-1}$}\\
+\colorbox{midred}{$\displaystyle u_n$}\\
+\colorbox{lightblue}{$\displaystyle y_0$}\\
+\vdots\\
+\colorbox{lightblue}{$\displaystyle y_{n-1}$}\\
+\colorbox{lightblue}{$\displaystyle y_n$}
+\end{bmatrix}
+=
+\underbrace{
+\begin{bmatrix}
+I_{n+1} & 0\\
+\mathcal{G}_{n+1} & \mathcal{O}_{n+1}
+\end{bmatrix}}_{\Lambda_{n+1}}
+\begin{bmatrix}
+\colorbox{lightred}{$\displaystyle u_0$}\\
+\vdots\\
+\colorbox{lightred}{$\displaystyle u_{n-1}$}\\
+\colorbox{midred}{$\displaystyle u_n$}\\
+x_0
+\end{bmatrix}.
+\]
+The matrix $\Lambda_{n+1}$ has size
+\[
+2(n+1)\times(2n+1),
+\]
+and rank
+\[
+\operatorname{rank}(\Lambda_{n+1})=(n+1)+n=2n+1.
+\]
+So the admissible input--output trajectories of length $n+1$ form a subspace of dimension $2n+1$ inside the ambient space $\mathbb{R}^{2(n+1)}$. This means that not every arbitrary vector in $\mathbb{R}^{2(n+1)}$ is a valid trajectory anymore: one scalar compatibility condition must be satisfied.\\
+This is the first horizon length at which the dynamics impose a genuine restriction on the input--output sequence. Up to length $n$, every sequence can be explained by a suitable initial condition; from length $n+1$ onward, only a proper subspace of all possible stacked vectors is admissible.\\
+\subsubsection{Multi-step prediction as trajectory completion}
+This immediately leads to a one-step prediction problem. Suppose the inputs
+\[
+u_0,\dots,u_n
+\]
+and the first $n$ outputs
+\[
+y_0,\dots,y_{n-1}
+\]
+are known, while the last output $y_n$ is missing. Then we can write
+\[
+\begin{bmatrix}
+\colorbox{lightred}{$\displaystyle u_0$}\\
+\vdots\\
+\colorbox{lightred}{$\displaystyle u_{n-1}$}\\
+\colorbox{midred}{$\displaystyle u_n$}\\
+\colorbox{lightblue}{$\displaystyle y_0$}\\
+\vdots\\
+\colorbox{lightblue}{$\displaystyle y_{n-1}$}\\
+\colorbox{yellowblock}{$\displaystyle y_n$}
+\end{bmatrix}
+=
+\underbrace{
+\begin{bmatrix}
+I_{n+1} & 0\\
+\mathcal{G}_{n+1} & \mathcal{O}_{n+1}
+\end{bmatrix}}_{\Lambda_{n+1}}
+\begin{bmatrix}
+\colorbox{lightred}{$\displaystyle u_0$}\\
+\vdots\\
+\colorbox{lightred}{$\displaystyle u_{n-1}$}\\
+\colorbox{midred}{$\displaystyle u_n$}\\
+x_0
+\end{bmatrix}.
+\]
+Can $y_n$ be reconstructed? Yes. The reason is simple: from the first $n$ input--output samples we can reconstruct $x_0$, because that is exactly the observability problem already discussed. Once $x_0$ is known, and since the input sequence is known up to time $n$, we can propagate the system dynamics one step further and determine $y_n$ uniquely.\\
+The same idea extends to multi-step prediction. Let $L=n+K$ with $K\geq 1$. Then
+\[
+\begin{bmatrix}
+\colorbox{lightred}{$\displaystyle u_0$}\\
+\vdots\\
+\colorbox{lightred}{$\displaystyle u_{n-1}$}\\
+\colorbox{midred}{$\displaystyle u_n$}\\
+\vdots\\
+\colorbox{midred}{$\displaystyle u_{n+K-1}$}\\
+\colorbox{lightblue}{$\displaystyle y_0$}\\
+\vdots\\
+\colorbox{lightblue}{$\displaystyle y_{n-1}$}\\
+\colorbox{yellowblock}{$\displaystyle y_n$}\\
+\vdots\\
+\colorbox{yellowblock}{$\displaystyle y_{n+K-1}$}
+\end{bmatrix}
+=
+\underbrace{
+\begin{bmatrix}
+I_{n+K} & 0\\
+\mathcal{G}_{n+K} & \mathcal{O}_{n+K}
+\end{bmatrix}}_{\Lambda_{n+K}}
+\begin{bmatrix}
+\colorbox{lightred}{$\displaystyle u_0$}\\
+\vdots\\
+\colorbox{lightred}{$\displaystyle u_{n-1}$}\\
+\colorbox{midred}{$\displaystyle u_n$}\\
+\vdots\\
+\colorbox{midred}{$\displaystyle u_{n+K-1}$}\\
+x_0
+\end{bmatrix}.
+\]
+Suppose now that the sequence
+\[
+y_n,\dots,y_{n+K-1}
+\]
+is missing. Can it be reconstructed? Again yes. From the first $n$ input--output samples we reconstruct the initial state $x_0$, and once $x_0$ is known, the known future inputs determine the future outputs uniquely. So the missing output block is exactly the unique completion for which the stacked vector belongs to the trajectory subspace of the system.\\
+This gives a useful predictive-control interpretation. The block
+\[
+\colorbox{lightred}{$\displaystyle u_0,\dots,u_{n-1}$}
+\]
+represents the past inputs, the block
+\[
+\colorbox{lightblue}{$\displaystyle y_0,\dots,y_{n-1}$}
+\]
+represents the past outputs, the block
+\[
+\colorbox{midred}{$\displaystyle u_n,\dots,u_{n+K-1}$}
+\]
+represents the future input sequence we choose, and the block
+\[
+\colorbox{yellowblock}{$\displaystyle y_n,\dots,y_{n+K-1}$}
+\]
+is the future output sequence implied by trajectory compatibility.\\
+\subsubsection{Basis representation of the trajectory space}
+All of this admits a clean linear-algebra interpretation. For any horizon $L>n$, the set of valid input--output trajectories is a subspace of dimension $L+n$:
+\[
+\operatorname{im}(\Lambda_L)\subseteq \mathbb{R}^{2L},
+\qquad
+\dim\bigl(\operatorname{im}(\Lambda_L)\bigr)=L+n.
+\]
+Therefore every admissible trajectory can be written as
+\[
+\begin{bmatrix}
+\colorbox{lightred}{$\displaystyle u_0$}\\
+\vdots\\
+\colorbox{lightred}{$\displaystyle u_{n-1}$}\\
+\colorbox{midred}{$\displaystyle u_n$}\\
+\vdots\\
+\colorbox{midred}{$\displaystyle u_{n+K-1}$}\\
+\colorbox{lightblue}{$\displaystyle y_0$}\\
+\vdots\\
+\colorbox{lightblue}{$\displaystyle y_{n-1}$}\\
+\colorbox{yellowblock}{$\displaystyle y_n$}\\
+\vdots\\
+\colorbox{yellowblock}{$\displaystyle y_{n+K-1}$}
+\end{bmatrix}
+=Hg,
+\]
+where
+\[
+H\in\mathbb{R}^{2L\times(L+n)}
+\]
+has columns that form a basis of the trajectory subspace, and
+\[
+g\in\mathbb{R}^{L+n}
+\]
+is a vector of coefficients.\\
+A natural choice for such a basis is given by the columns of $\Lambda_L$. However, constructing $\Lambda_L$ requires explicit knowledge of $A$, $B$, and $C$. This suggests a different question: can we build another basis for the same subspace directly from data?\\
+Since the trajectory space has dimension $L+n$, any set of $L+n$ linearly independent valid trajectories of length $L$ forms a basis. Suppose we collect $L+n$ admissible input--output trajectories
+\[
+\begin{bmatrix}
+u^{(1)}_{[0,L-1]}\\[1mm]
+y^{(1)}_{[0,L-1]}
+\end{bmatrix},
+\quad
+\begin{bmatrix}
+u^{(2)}_{[0,L-1]}\\[1mm]
+y^{(2)}_{[0,L-1]}
+\end{bmatrix},
+\quad \dots,\quad
+\begin{bmatrix}
+u^{(L+n)}_{[0,L-1]}\\[1mm]
+y^{(L+n)}_{[0,L-1]}
+\end{bmatrix},
+\]
+and assume they are linearly independent. Then all and only the valid trajectories can be represented as
+\[
+\begin{bmatrix}
+u_{[0,L-1]}\\[1mm]
+y_{[0,L-1]}
+\end{bmatrix}
+=
+\underbrace{
+\begin{bmatrix}
+u^{(1)}_{[0,L-1]} & u^{(2)}_{[0,L-1]} & u^{(3)}_{[0,L-1]} & \cdots & u^{(L+n)}_{[0,L-1]}\\[1mm]
+y^{(1)}_{[0,L-1]} & y^{(2)}_{[0,L-1]} & y^{(3)}_{[0,L-1]} & \cdots & y^{(L+n)}_{[0,L-1]}
+\end{bmatrix}}_{H}
+g,
+\qquad g\in\mathbb{R}^{L+n}.
+\]\\
+This is the key step toward a data-driven description of the system behavior. Instead of generating the basis from the model matrices, we generate it from measured trajectories. A new admissible trajectory is then obtained as a linear combination of previously observed admissible trajectories. Conceptually, one can think of the measured signals as building blocks: if they span the trajectory space, then every other valid trajectory can be synthesized by combining them with suitable coefficients.\\
+
+At this point it is useful to check these ideas on a very simple example.
+\subsubsection{Example: rank of the trajectory matrix}
+\paragraph{Exercise.}
+Consider the scalar SISO system with $n=1$
+\[
+x_{t+1}=x_t+u_t,
+\qquad
+y_t=x_t,
+\]
+and trajectories of length $L=3$.\\
+If we generate several input--output trajectories of length $L$ by choosing random initial conditions and random input sequences, and then stack them as columns of the matrix
+\[
+H=
+\begin{bmatrix}
+u^{(1)}_{[0,2]} & u^{(2)}_{[0,2]} & \cdots \\
+y^{(1)}_{[0,2]} & y^{(2)}_{[0,2]} & \cdots
+\end{bmatrix},
+\]
+what is the maximum rank that $H$ can achieve?\\
+Since here $n=1$ and $L=3$, the dimension of the trajectory subspace is
+\[
+L+n=3+1=4.
+\]
+Therefore the rank of $H$ can never exceed $4$, no matter how many columns we add. If the collected trajectories are sufficiently rich, then as we keep increasing the number of columns, the rank of $H$ will eventually saturate at
+\[
+\operatorname{rank}(H)=4.
+\]
+So the maximum possible rank is $4$. This is exactly what we should expect from the behavioral viewpoint: all valid trajectories of length $3$ live in a $4$-dimensional subspace of $\mathbb{R}^{6}$.\\
+\subsection{From trajectory bases to Hankel-based prediction}
+\subsubsection{Reusing a single experiment through overlapping windows}
+The discussion so far suggests that, in order to build a basis of the trajectory space, we need many trajectories of length $L$. However, this seems wasteful: data are often expensive to collect, and generating many independent experiments may be impractical. It is therefore natural to ask whether one can reuse more efficiently the samples of a single long experiment.\\
+Suppose that we want to predict $K$ steps into the future for a system of dimension $n$. Then, as discussed above, we need trajectories of length
+\[
+L=n+K.
+\]
+Moreover, since the trajectory space has dimension $L+n$, we need at least
+\[
+L+n=(n+K)+n=K+2n
+\]
+linearly independent trajectories to span it.\\
+A very efficient way to extract many such trajectories from one long signal is to use overlapping windows. Consider a long input sequence
+\[
+u_0,u_1,u_2,\dots
+\]
+and slide a window of length $L$ along it. Each window produces one candidate trajectory segment:
+\[
+\colorbox{lightblue}{$\displaystyle u_0\;u_1\;u_2\;\cdots\;u_{L-1}$},
+\qquad
+\colorbox{lightred}{$\displaystyle u_1\;u_2\;u_3\;\cdots\;u_L$},
+\qquad
+\colorbox{lightgreen}{$\displaystyle u_2\;u_3\;u_4\;\cdots\;u_{L+1}$},
+\quad \dots
+\]
+Instead of treating these windows separately, we arrange them as columns of a matrix:
+\[
+\mathcal{H}_L(u)=
+\begin{bmatrix}
+\colorbox{lightblue}{$\displaystyle u_0$} & \colorbox{lightred}{$\displaystyle u_1$} & \colorbox{lightgreen}{$\displaystyle u_2$} & \cdots & u_{L+n-1}\\
+\colorbox{lightblue}{$\displaystyle u_1$} & \colorbox{lightred}{$\displaystyle u_2$} & \colorbox{lightgreen}{$\displaystyle u_3$} & \cdots & u_{L+n}\\
+\colorbox{lightblue}{$\displaystyle u_2$} & \colorbox{lightred}{$\displaystyle u_3$} & \colorbox{lightgreen}{$\displaystyle u_4$} & \cdots & u_{L+n+1}\\
+\vdots & \vdots & \vdots & \ddots & \vdots\\
+\colorbox{lightblue}{$\displaystyle u_{L-1}$} & \colorbox{lightred}{$\displaystyle u_L$} & \colorbox{lightgreen}{$\displaystyle u_{L+1}$} & \cdots & u_{2L+n-2}
+\end{bmatrix}.
+\]
+This is the \emph{Hankel matrix} built from the signal $u$. The same construction can be carried out for the output signal:
+\[
+\mathcal{H}_L(y)=
+\begin{bmatrix}
+\colorbox{lightblue}{$\displaystyle y_0$} & \colorbox{lightred}{$\displaystyle y_1$} & \colorbox{lightgreen}{$\displaystyle y_2$} & \cdots & y_{L+n-1}\\
+\colorbox{lightblue}{$\displaystyle y_1$} & \colorbox{lightred}{$\displaystyle y_2$} & \colorbox{lightgreen}{$\displaystyle y_3$} & \cdots & y_{L+n}\\
+\colorbox{lightblue}{$\displaystyle y_2$} & \colorbox{lightred}{$\displaystyle y_3$} & \colorbox{lightgreen}{$\displaystyle y_4$} & \cdots & y_{L+n+1}\\
+\vdots & \vdots & \vdots & \ddots & \vdots\\
+\colorbox{lightblue}{$\displaystyle y_{L-1}$} & \colorbox{lightred}{$\displaystyle y_L$} & \colorbox{lightgreen}{$\displaystyle y_{L+1}$} & \cdots & y_{2L+n-2}
+\end{bmatrix}.
+\]
+So the relevant object is no longer a matrix whose columns are trajectories coming from many different experiments, but a matrix built from many shifted windows of one long experiment. This is much more economical in terms of data usage.\\
+\subsubsection{Hankel matrices as data-driven trajectory bases}
+The key claim is that all system trajectories of length $L$ can be generated as linear combinations of the columns of the stacked Hankel matrix
+\[
+\begin{bmatrix}
+\mathcal{H}_L(u)\\[1mm]
+\mathcal{H}_L(y)
+\end{bmatrix}g,
+\]
+where
+\[
+g\in\mathbb{R}^{L+n}
+\]
+is a free vector of coefficients. Notice that this requires input and output sequences of total length
+\[
+2L+n-1,
+\]
+because that is exactly the amount of data needed to build a Hankel matrix with $L+n$ columns and window length $L$.\\
+
+This representation should be compared with the abstract basis representation introduced before. There we wrote any admissible trajectory as
+\[
+\begin{bmatrix}
+u_{[0,L-1]}\\
+y_{[0,L-1]}
+\end{bmatrix}
+=Hg.
+\]
+Now we are proposing a concrete and data-driven choice for the basis matrix $H$, namely
+\[
+H=
+\begin{bmatrix}
+\mathcal{H}_L(u)\\[1mm]
+\mathcal{H}_L(y)
+\end{bmatrix}.
+\]
+So the role of the Hankel matrix is precisely to provide a trajectory basis directly from measured data.\\
+\subsubsection{Data-driven prediction with past and future blocks}
+This immediately yields a data-driven $K$-step predictor. Recall that for prediction we choose
+\[
+L=n+K.
+\]
+We then split the input and output trajectories into past and future parts exactly as before:
+\[
+\begin{bmatrix}
+u_{\mathrm{past}}\\
+u_{\mathrm{future}}\\
+y_{\mathrm{past}}\\
+\textcolor{red}{y_{\mathrm{future}}}
+\end{bmatrix}
+=
+\begin{bmatrix}
+\mathcal{H}_L(u_{\mathrm{data}})\\[1mm]
+\mathcal{H}_L(y_{\mathrm{data}})
+\end{bmatrix}\textcolor{red}{g}.
+\]
+Here the blocks have the following meaning:
+\begin{itemize}
+    \item \(\colorbox{lightblue}{$\displaystyle u_{\mathrm{past}}$}\) is the measured past input trajectory,
+    \item \(\colorbox{lightred}{$\displaystyle u_{\mathrm{future}}$}\) is the future input sequence chosen by the controller,
+    \item \(\colorbox{lightblue}{$\displaystyle y_{\mathrm{past}}$}\) is the measured past output trajectory,
+    \item \(\colorbox{red!20}{$\displaystyle y_{\mathrm{future}}$}\) is the unknown future output sequence to be predicted.
+\end{itemize}
+In the notation used in the figures, one often highlights the unknown quantities by writing
+\[
+\color{red}{g\in\mathbb{R}^{2n+K}}
+\qquad\text{and}\qquad
+\color{red}{y_{\mathrm{future}}\in\mathbb{R}^{K}}.
+\]
+These are exactly the unknowns of the prediction problem. Their total number is
+\[
+(2n+K)+K=2(n+K)=2L.
+\]
+On the other hand, the stacked equation above provides exactly \(2L\) scalar equations. So, at least at the counting level, the predictor is square: the number of unknowns matches the number of equations.\\
+The interpretation is very appealing. Given the measured past input--output data and a candidate future input sequence, we solve for a coefficient vector \(g\) such that the complete trajectory is compatible with the data matrix. Once such a \(g\) is found, the future output block is obtained automatically. In other words, prediction is performed by enforcing membership in the trajectory space spanned by the measured data.\\
+\subsection{From data-driven prediction to data-enabled predictive control}
+\subsubsection{From prediction to control}
+This data-driven predictor has several natural uses:
+\begin{itemize}
+    \item filtering,
+    \item recovering missing data,
+    \item prediction and simulation,
+    \item and, most importantly for us, control.
+\end{itemize}
+This is the crucial point where trajectory-based prediction becomes predictive control. Instead of only asking which future output is compatible with a chosen future input, we will soon ask which future input should be chosen so that the predicted future output satisfies our control objective.\\
+
+We are now ready to turn this predictor into a control law. To make the connection with the standard MPC formulation as transparent as possible, let us first recall the model-based output-tracking MPC problem in the SISO case.\\
+At each time step, the current state \(x\) is measured and one solves
+\[
+\min_{u,x,y}\;\sum_{k=0}^{K-1} y_k^2 + r u_k^2
+\]
+subject to
+\[
+\textcolor{red}{x_{k+1}=Ax_k+Bu_k},
+\qquad
+\textcolor{red}{y_k=Cx_k},
+\qquad
+\textcolor{red}{x_0=x},
+\]
+and the constraints
+\[
+u_k\in\mathcal{U}_k \quad \forall k,
+\qquad
+y_k\in\mathcal{Y}_k \quad \forall k.
+\]
+The role of the \textcolor{red}{model equations} is to enforce that the decision variables \(u\) and \(y\) are genuine trajectories of the plant over the next \(K\) steps. In other words, the model is exactly the mechanism that couples candidate future inputs to dynamically feasible future outputs.\\
+\subsubsection{The data-enabled predictive control formulation}
+The behavioral viewpoint suggests a different way to impose exactly the same requirement. Instead of using the parametric state-space model, we can use the trajectory space generated by the measured data. This leads to the \emph{data-enabled predictive control} formulation.\\
+Using the Hankel representation introduced above, we solve
+\[
+\min_{u,y,g}\;\sum_{k=0}^{K-1} y_k^2 + r u_k^2
+\]
+subject to
+\[
+\begin{bmatrix}
+\mathcal{H}_L(u_{\mathrm{data}})\\[1mm]
+\mathcal{H}_L(y_{\mathrm{data}})
+\end{bmatrix}g
+=
+\begin{bmatrix}
+\textcolor{cyan}{u_{\mathrm{past}}}\\
+u\\
+\textcolor{cyan}{y_{\mathrm{past}}}\\
+y
+\end{bmatrix},
+\]
+and
+\[
+u_k\in\mathcal{U}_k \quad \forall k,
+\qquad
+y_k\in\mathcal{Y}_k \quad \forall k.
+\]
+Here the state-space model has been replaced by the new \textcolor{cyan}{behavioral model}. The variables
+\[
+\textcolor{cyan}{u_{\mathrm{past}}},\qquad \textcolor{cyan}{y_{\mathrm{past}}}
+\]
+are the last measured input and output samples of the system. They play exactly the role that the initial condition \(x_0=x\) played in the model-based formulation: they encode all the information needed to determine which future trajectories are compatible with the current operating condition of the plant.\\
+
+Compared with the model-based MPC problem, a new decision variable \(g\) has appeared. This variable does not have a direct physical meaning such as state, input, or output. Its purpose is simply to express the predicted trajectory as a linear combination of columns of the data matrix. In this sense, \(g\) is the coefficient vector that selects one admissible trajectory inside the behavioral subspace.\\
+It is instructive to compare the two formulations side by side. In model-based MPC, the dynamic feasibility of the future signals is enforced through
+\[
+x_{k+1}=Ax_k+Bu_k,\qquad y_k=Cx_k,\qquad x_0=x.
+\]
+In data-enabled predictive control, the same role is played by the single trajectory-consistency equation
+\[
+\begin{bmatrix}
+\mathcal{H}_L(u_{\mathrm{data}})\\[1mm]
+\mathcal{H}_L(y_{\mathrm{data}})
+\end{bmatrix}g
+=
+\begin{bmatrix}
+u_{\mathrm{past}}\\
+u\\
+y_{\mathrm{past}}\\
+y
+\end{bmatrix}.
+\]
+So the logic of the optimization problem is unchanged: we still optimize over future inputs and outputs subject to input and output constraints. The only difference is how we describe the set of feasible trajectories. In one case we use the matrices \(A,B,C\); in the other we use measured data.\\
+\subsubsection{Comparison with model-based MPC}
+This replacement has a few immediate consequences.
+
+\begin{itemize}
+    \item The data-enabled formulation is computationally more complex, because it introduces \(2n+K\) additional decision variables through the coefficient vector \(g\).
+    \item Its memory footprint is larger, because we store a data matrix rather than a compact parametric model \((A,B,C)\).
+    \item On the other hand, no additional state estimator is needed: the past input--output trajectory \(\textcolor{cyan}{(u_{\mathrm{past}},y_{\mathrm{past}})}\) already plays the role of the initial condition.
+\end{itemize}
+
+This last point is conceptually important. In model-based MPC, if the state is not directly measured, one typically needs an observer or estimator to reconstruct it. In the behavioral formulation, the recent past trajectory already contains the information needed to anchor the prediction to the current system condition. So the controller works directly with measured input--output data, without explicitly reconstructing a state.\\
+We should therefore think of data-enabled predictive control as a trajectory-based counterpart of standard MPC:
+\begin{itemize}
+    \item same objective,
+    \item same input and output constraints,
+    \item same receding-horizon logic,
+    \item but a different internal description of the plant.
+\end{itemize}
+The model-based controller enforces feasibility through equations in the state; the data-enabled controller enforces feasibility through membership in the trajectory space spanned by data.\\
+\subsection{Practical issues: excitation, MIMO extension, and noise}
+\subsubsection{Persistence of excitation}
+Before going further, it is worth pausing for a few practical remarks. The previous construction relied on one crucial assumption: the collected data must be sufficiently informative. In system identification language, this is the assumption of \emph{persistence of excitation}.\\
+
+More precisely, we assumed that the input used for data collection is rich enough so that the resulting Hankel data matrix has full rank. Technically, this is needed to ensure that the measured trajectories span the relevant trajectory subspace. Intuitively, the meaning is simple: if the data do not excite all relevant modes of the system, then the collected trajectories cannot represent the full dynamics of the plant, and the behavioral model built from them will be incomplete.\\
+This requirement is completely standard in identification. In practice, it is typically handled in one of the following ways:
+\begin{itemize}
+    \item by applying deliberately rich excitation signals during data collection, for example random inputs or PRBS-type inputs;
+    \item in some applications, by relying on ambient or process noise to provide enough excitation;
+    \item by using historical data and then checking \emph{a posteriori} whether the resulting data matrix has the required rank.
+\end{itemize}
+So persistence of excitation is not a special drawback of data-enabled predictive control; it is the usual price one pays whenever one wants to learn a dynamical model from data.\\
+\subsubsection{Extension from SISO to MIMO}
+Up to now we have mostly discussed the SISO case, because it makes the geometry of the construction easier to see. However, the theory extends naturally to the MIMO case. Suppose now that
+\[
+u_t\in\mathbb{R}^m,\qquad y_t\in\mathbb{R}^p,\qquad x_t\in\mathbb{R}^n.
+\]
+The main conceptual difference is that, in the multi-input multi-output setting, the number of past samples needed to encode the current state information is not necessarily equal to the state dimension \(n\). Instead, the relevant quantity is the \emph{lag} of the system.\\
+The lag is defined as the smallest integer \(\ell\) such that the extended observability matrix
+\[
+\mathcal{O}_{\ell}=
+\begin{bmatrix}
+C\\
+CA\\
+\vdots\\
+CA^{\ell-1}
+\end{bmatrix}
+\]
+has rank \(n\). In other words, \(\ell\) is the smallest number of consecutive output samples needed so that the observability matrix reaches full column rank. This quantity plays exactly the role that \(n\) played in the SISO discussion. In particular, a past trajectory of length
+\[
+T_{\mathrm{ini}}\geq \ell
+\]
+is needed in order to play the role of the initial condition. Thus, in the MIMO case, the past input--output data block
+\[
+(u_{\mathrm{past}},y_{\mathrm{past}})
+\]
+must contain at least \(T_{\mathrm{ini}}\) samples, with \(T_{\mathrm{ini}}\) no smaller than the lag.\\
+
+The amount of data required to build the Hankel representation also changes. For MIMO systems, if we want to predict over a horizon of length \(K\), and if we use a past window of length \(T_{\mathrm{ini}}\), then an input--output sequence of length at least
+\[
+T\;\geq\;(m+1)(T_{\mathrm{ini}}+K)+n-1
+\]
+is needed. For SISO systems, where \(m=1\) and \(\ell=n\), this reduces to the condition already encountered earlier.\\
+This observation has an important practical implication. Since always
+\[
+\ell\leq n,
+\]
+in practice one often needs at least an approximate estimate of the minimal realization order \(n\), or at least of a suitable upper bound. This is because the choice of \(T_{\mathrm{ini}}\) and the amount of data needed both depend on these structural quantities.\\
+
+How can such an estimate be obtained? There are two common routes. One is to use first-principles knowledge of the plant. For example, in many electro-mechanical systems one often has a fairly good idea of the system order from physics. The other is to perform an \emph{a posteriori} verification from data, for example by building increasingly large Hankel matrices and checking when the relevant rank conditions stabilize.\\
+Once an estimate of the order is available, the safe choice
+\[
+T_{\mathrm{ini}}=n
+\]
+is always valid, although in some cases side information allows one to use a smaller value, closer to the true lag \(\ell\). The prediction horizon \(K\), instead, is chosen from the control specifications, exactly as in standard MPC.\\
+
+So the practical design procedure is conceptually quite similar to model-based predictive control:
+\begin{itemize}
+    \item choose \(K\) from the control task;
+    \item choose \(T_{\mathrm{ini}}\) large enough to encode the current condition of the system;
+    \item collect sufficiently exciting data so that the Hankel matrix has the right rank properties.
+\end{itemize}
+These remarks clarify an important point. Data-enabled predictive control does not remove the need for structural information entirely. Rather, it shifts the emphasis: instead of identifying explicitly the matrices \(A,B,C\), one needs enough information to choose the data window lengths correctly and enough excitation so that the data span the relevant trajectory space.\\
+\subsubsection{Effect of noise on the trajectory representation}
+A final important issue is the effect of noise. Up to this point, the discussion has implicitly relied on exact trajectories and exact algebraic relations. In that ideal setting, adding more and more columns to the data matrix does not hurt. On the contrary, it is beneficial:
+\begin{itemize}
+    \item it helps when we are uncertain about the true system order \(n\),
+    \item it increases the chance that all system modes have been sufficiently excited,
+    \item and, once enough informative trajectories have been collected, the rank of the data matrix stops increasing.
+\end{itemize}
+
+In the noiseless case, this saturation is exactly what we expect. The set of valid trajectories has finite dimension, so after collecting enough independent columns, new columns can only be linear combinations of the previous ones. For a MIMO system with input dimension \(m\), the relevant dimension is \(mL+n\), and therefore the rank of the trajectory matrix \(H\) cannot grow beyond that value.\\
+However, this conclusion is true only in the noiseless case. In the presence of \textcolor{red}{noise in the data}, the situation changes qualitatively: the measured trajectories are no longer exactly confined to the true trajectory subspace. As a consequence, the rank of the empirical matrix \(H\) may continue to increase past the nominal value \(mL+n\). In other words, noise artificially inflates the apparent dimension of the trajectory space.\\
+
+This is more than a purely algebraic inconvenience. It can have a serious control consequence, because the controller may start interpreting noisy directions as if they were true dynamical directions of the system.\\
+To understand the mechanism, consider the following pathological example. Suppose that one component of the output is identically zero, so that the output equation has the form
+\[
+y_k=Cx_k=
+\begin{bmatrix}
+\star & \star & \star\\
+0 & 0 & 0
+\end{bmatrix}x_k.
+\]
+Then every true output vector must be of the form
+\[
+y_k=
+\begin{bmatrix}
+\star\\
+0
+\end{bmatrix}.
+\]
+So the second output component is completely unaffected by the state: it is structurally zero and cannot be influenced by the control input.\\
+
+Now imagine that the data used to build the trajectory matrix are noisy. Then some measured output trajectories may contain a small nonzero component in that second output coordinate. Symbolically, one of the columns of the data matrix may look like
+\[
+\underbrace{
+\begin{bmatrix}
+u^{(1)}_{L} & u^{(2)}_{L} & u^{(3)}_{L} & \cdots\\[1mm]
+y^{(1)}_{L} & y^{(2)}_{L} & \colorbox{yellowblock}{$\displaystyle y^{(3)}_{L}+\varepsilon$} & \cdots
+\end{bmatrix}}_{H}g.
+\]
+Because the controller only sees the data matrix, it may incorrectly infer that the input sequence \(u^{(3)}_{L}\) is capable of affecting that last output component. But this is false: the apparent effect is caused only by measurement noise.\\
+
+This misunderstanding can be dangerous. The optimization may try to exploit that fake direction by assigning a large coefficient to the corresponding column. In other words, it may choose a large \(g\), and therefore indirectly a large input, in an attempt to regulate an output component that is in fact uncontrollable. So noise can lead to aggressive and meaningless control actions if the raw trajectory parameterization is used without protection.\\
+\subsubsection{Regularization and slack variables}
+This is the motivation for \emph{regularized} data-enabled predictive control. The key observation is that, in theory, only \(L+n\) independent components of \(g\) are really needed. If many more columns are present in the data matrix, then the representation of a trajectory through \(g\) becomes highly non-unique, especially in the presence of noise. A natural way to promote robustness is therefore to penalize the size of \(g\).\\
+
+A common choice is to add an \(\ell_1\)-regularization term:
+\[
+\min_{u,y,g}\;\sum_{k=0}^{K-1} y_k^2 + r u_k^2 + \lambda_g \|g\|_1
+\]
+subject to
+\[
+\begin{bmatrix}
+\mathcal{H}_L(u_{\mathrm{data}})\\[1mm]
+\mathcal{H}_L(y_{\mathrm{data}})
+\end{bmatrix}g
+=
+\begin{bmatrix}
+\textcolor{cyan}{u_{\mathrm{past}}}\\
+u\\
+\textcolor{cyan}{y_{\mathrm{past}}}\\
+y
+\end{bmatrix},
+\]
+and
+\[
+u_k\in\mathcal{U}_k \quad \forall k,
+\qquad
+y_k\in\mathcal{Y}_k \quad \forall k.
+\]
+
+The role of the term \(\lambda_g\|g\|_1\) is to discourage the use of unnecessarily many columns of the data matrix. In other words, it promotes sparse coefficient vectors, which is consistent with the idea that only a limited number of truly independent directions should matter. This improves robustness to noise, because spurious noisy directions are less likely to be exploited heavily.\\
+There is, however, a tradeoff. Larger values of \(\lambda_g\) increase robustness, but they also bias the solution and may degrade nominal optimality. Intuitively, stronger regularization corresponds to choosing a simpler effective model hidden inside the data. In fact, one may interpret a larger value of \(\lambda_g\) as promoting a description with a smaller effective order. From this viewpoint, the sparsity pattern of \(g\) also carries structural information: \emph{a posteriori}, the quantity
+\[
+\|g\|_0
+\]
+gives an indication of how many columns are actually being used, and therefore of the effective model size suggested by the data.\\
+
+So far, the regularization addressed noise in the \emph{offline data matrix}. But noise may also affect the \emph{real-time measurements} used as initial conditions, namely the past input--output block \((u_{\mathrm{past}},y_{\mathrm{past}})\). This creates a second difficulty.\\
+Indeed, the measured sequence of length \(T_{\mathrm{ini}}\) may itself fail to be exactly compatible with the trajectory space generated by the data matrix. In other words, because of online measurement noise, there may exist no exact \(g\) satisfying
+\[
+\begin{bmatrix}
+\mathcal{H}_L(u_{\mathrm{data}})\\[1mm]
+\mathcal{H}_L(y_{\mathrm{data}})
+\end{bmatrix}g
+=
+\begin{bmatrix}
+u_{\mathrm{past}}\\
+u\\
+y_{\mathrm{past}}\\
+y
+\end{bmatrix}.
+\]
+To handle this, one introduces a slack variable \(\sigma\) on the noisy past output block and penalizes it:
+\[
+\min_{u,y,g,\sigma}\;\sum_{k=0}^{K-1} y_k^2 + r u_k^2 + \lambda_g \|g\|_1 + \lambda_\sigma \|\sigma\|_1
+\]
+subject to
+\[
+\begin{bmatrix}
+\mathcal{H}_L(u_{\mathrm{data}})\\[1mm]
+\mathcal{H}_L(y_{\mathrm{data}})
+\end{bmatrix}g
+=
+\begin{bmatrix}
+\textcolor{cyan}{u_{\mathrm{past}}}\\
+u\\
+\textcolor{cyan}{y_{\mathrm{past}}+\sigma}\\
+y
+\end{bmatrix},
+\]
+and
+\[
+u_k\in\mathcal{U}_k \quad \forall k,
+\qquad
+y_k\in\mathcal{Y}_k \quad \forall k.
+\]
+Here the slack \(\sigma\) allows the past measured output trajectory to be adjusted slightly so that it becomes compatible with the data-driven model. The penalty \(\lambda_\sigma\|\sigma\|_1\) keeps this correction as small as possible. So the optimization is now balancing four goals at once:
+\begin{itemize}
+    \item good tracking performance,
+    \item moderate control effort,
+    \item sparse and robust trajectory coefficients \(g\),
+    \item and small corrections of the noisy real-time measurements.
+\end{itemize}
+This should be compared with the classical identification-based pipeline. There too, one must deal with noise: first in identifying a model, then in estimating the state, and then again in applying MPC on top of the estimated model. The data-enabled approach does not eliminate the noise problem, but it handles it directly at the trajectory level. In the course perspective, this is one of its main appeals: instead of going through the chain
+\[
+\text{data} \;\to\; \text{system identification} \;\to\; \text{state-space model} \;\to\; \text{MPC},
+\]
+one works directly with
+\[
+\text{data} \;\to\; \text{data-enabled control}.
+\]
+There is increasing recent evidence that this direct route can be more robust to noise than the indirect identification-then-control pipeline, especially when the available data are limited or the identified model is imperfect.\\
+
+So the main takeaway is the following. In the noiseless setting, trajectory spaces have the exact low-dimensional structure predicted by the theory. In the noisy setting, this structure is blurred, and the controller must be regularized. Penalizing \(g\) protects against spurious directions in the offline data matrix, while penalizing a slack variable \(\sigma\) protects against inconsistency in the online measurements. These two modifications are what make data-enabled predictive control usable in practice.\\
+\subsection{Limitations and final perspective}
+\subsubsection{Main limitations}
+We conclude the chapter with a few remarks on the limitations of data-driven predictive control. Up to this point, the method may have looked like a very general replacement for model-based MPC. It is powerful, but it is not universally the best choice.\\
+A first difficulty appears when \emph{state constraints} are important. The behavioral formulation is naturally expressed in terms of input and output trajectories. If a particular internal state is known, has a physical meaning, and must be explicitly constrained, then a model-based approach may be preferable. In a state-space model, such constraints can be imposed directly on the state variable. In a purely data-driven formulation, by contrast, the state is not explicit, so incorporating such information is more cumbersome.\\
+
+A second limitation concerns \emph{prior or side information}. Sometimes one does not know the full model, but one does know something important about the system: admissible parameter ranges, nominal values, structural properties, conservation laws, or the specific form of the dynamics. Classical system identification can often incorporate this kind of information naturally into the model structure or the estimation procedure. A pure trajectory-based description is less flexible in this respect, because it treats the plant mainly through observed behaviors rather than through interpretable parameters.\\
+
+A third issue is \emph{nonlinearity}. The whole theory developed in this chapter relies strongly on linear time-invariant system theory. The finite-dimensional trajectory-space representation, the Hankel parameterization, and the exact behavioral characterization are all fundamentally LTI results. Extending these ideas to nonlinear systems is much more complicated. There are important research directions in this area, but the clean linear-algebraic picture we used here does not carry over directly.\\
+
+Finally, there is the issue of \emph{computational complexity}. A data representation is typically less compact than a state-space model. Once a concise model \((A,B,C)\) is available, predictions can be generated with a small number of variables and equations. In contrast, the data-enabled formulation stores entire trajectory matrices and introduces the coefficient vector \(g\), whose dimension grows with the data length and the chosen horizons. So the price one pays for avoiding explicit modeling is increased memory usage and, often, increased online computation time.\\
+These limitations should not be read as a rejection of data-driven control. Rather, they clarify when the method is especially attractive and when a model-based route may still have an advantage. If one has a good low-order model, strong prior knowledge, or crucial state constraints, then model-based MPC remains very compelling. If instead one wants to avoid an explicit identification step and has rich measured trajectories available, then the data-enabled route can be very attractive.\\
+\subsubsection{When data-driven predictive control is attractive}
+It is also worth ending on a broader perspective. At first sight, one might think that such a data-driven method is too fragile to be trusted on large-scale engineered systems, especially when:
+\begin{itemize}
+    \item the plant is extremely complex,
+    \item the actuators are very large and expensive,
+    \item and the controller must satisfy real-time, safety, and stability requirements.
+\end{itemize}
+Yet this intuition would be too pessimistic. Data-enabled predictive control has already attracted attention precisely in demanding application areas, including large-scale power systems and high-voltage direct-current links. The reason is simple: in such systems, obtaining an accurate model can itself be extremely difficult, while high-quality trajectory data are often available. In those situations, a direct trajectory-based controller can become competitive, and sometimes very appealing, because it bypasses part of the modeling burden.\\
+So the final message of the chapter is balanced. Data-driven predictive control is not magic, and it is not a universal substitute for modeling. It has clear weaknesses: handling state constraints is harder, incorporating side information is less natural, nonlinear systems remain challenging, and the data-based representation is computationally heavier. At the same time, it is much more than a theoretical curiosity. Even in highly demanding applications, the approach can work surprisingly well and can offer a serious alternative to the classical pipeline
+\[
+\text{data} \;\to\; \text{identify model} \;\to\; \text{estimate state} \;\to\; \text{run MPC}.
+\]
+This is what makes the topic interesting: the method is limited, but genuinely useful.
