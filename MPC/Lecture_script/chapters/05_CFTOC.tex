@@ -1,0 +1,1021 @@
+\section{Constrained finite time optimal control}
+
+In the previous chapter we studied finite- and infinite-horizon linear quadratic control in the
+absence of inequality constraints. That setting already showed the predictive-control logic very
+clearly: one optimizes over a future input sequence, predicts the resulting state trajectory, and
+uses the optimizer to determine the control action. However, one of the main reasons why MPC
+is so useful in practice is precisely that it can handle constraints explicitly. Real systems cannot
+operate with arbitrarily large inputs, and states or outputs are often restricted by safety,
+performance, or physical limitations.\\
+
+The ideal constrained problem would be an infinite-horizon optimal control problem of the form
+\[
+J_\infty^\star(x(0))
+=
+\min_{u(\cdot)}
+\sum_{i=0}^{\infty} \stagecost(x_i,u_i)
+\]
+subject to
+\[
+x_{i+1}=Ax_i+Bu_i,\qquad i=0,1,\dots,
+\]
+together with the constraints
+\[
+x_i\in\cX,\qquad u_i\in\cU,\qquad i=0,1,\dots,
+\]
+and the initial condition
+\[
+x_0=x(0).
+\]
+This problem is conceptually attractive because it captures the long-term consequences of the
+control action while respecting the constraints at all times. The difficulty is that it involves an
+infinite number of decision variables, so it is generally not directly computable online.\\
+
+The standard MPC idea is therefore to replace this ideal problem by a constrained finite time
+optimal control problem over a horizon of length \(N\). At time \(k\), one solves
+\[
+J^\star(x(k))
+=
+\min_{U}
+\terminalcost(x_N)+\sum_{i=0}^{N-1}\stagecost(x_i,u_i)
+\]
+subject to
+\[
+x_{i+1}=Ax_i+Bu_i,\qquad i=0,\dots,N-1,
+\]
+\[
+x_i\in\cX,\qquad u_i\in\cU,\qquad i=0,\dots,N-1,
+\]
+\[
+x_N\in \cX_f,
+\]
+\[
+x_0=x(k),
+\]
+where
+\[
+U=\{u_0,\dots,u_{N-1}\}.
+\]
+The finite horizon makes the problem computationally tractable, while the terminal cost
+\(\terminalcost(x_N)\) and terminal set \(\cX_f\) are introduced to approximate the effect of the
+tail beyond the prediction horizon.
+
+\subsection{General CFTOC formulation}
+
+Throughout this chapter we consider a discrete-time linear system
+\[
+x_{i+1}=Ax_i+Bu_i,
+\]
+with state and input constrained to lie in polyhedral sets
+\[
+\cX=\{x\in\R^n\mid A_xx\le b_x\},
+\qquad
+\cU=\{u\in\R^m\mid A_uu\le b_u\},
+\]
+and terminal set
+\[
+\cX_f=\{x\in\R^n\mid A_fx\le b_f\}.
+\]
+The associated cost has the general form
+\[
+J(x_0,U)=\terminalcost(x_N)+\sum_{i=0}^{N-1}\stagecost(x_i,u_i).
+\]
+Two important classes of cost functions will be considered. In the quadratic case, one uses
+\[
+\terminalcost(x_N)=x_N^\top P x_N,
+\qquad
+\stagecost(x_i,u_i)=x_i^\top Q x_i+u_i^\top R u_i,
+\]
+with
+\[
+P\succeq 0,\qquad Q\succeq 0,\qquad R\succ 0.
+\]
+In the norm-based case, one uses either the \(1\)-norm or the \(\infty\)-norm:
+\[
+\terminalcost(x_N)=\norm{P x_N}_p,
+\qquad
+\stagecost(x_i,u_i)=\norm{Qx_i}_p+\norm{Ru_i}_p,
+\qquad p\in\{1,\infty\},
+\]
+where the weighting matrices are chosen with appropriate rank assumptions so that the cost
+meaningfully penalizes the variables.
+
+\subsection{Feasible set}
+
+An important object associated with the constrained finite-horizon problem is its feasible set.
+It describes from which initial states the optimization problem can actually be solved while
+respecting all constraints over the horizon. For a given horizon \(N\), the feasible set is
+\[
+\cX_N
+=
+\Bigl\{
+x_0\in\R^n\;\Big|\;
+\exists (u_0,\dots,u_{N-1}) \text{ such that }
+x_i\in\cX,\;
+u_i\in\cU,\;
+i=0,\dots,N-1,
+\;
+x_N\in\cX_f,
+\;
+x_{i+1}=Ax_i+Bu_i
+\Bigr\}.
+\]
+This set is fundamental because outside \(\cX_N\) the CFTOC problem is simply infeasible.
+Notice also that \(\cX_N\) depends on the dynamics, the constraints, the terminal set, and the
+horizon length, but not on the specific choice of cost. The cost only selects, among the feasible
+trajectories, the one that is considered optimal.\\
+This is in clear contrast with the unconstrained LQR setting. There, every initial state is
+admissible because there are no state or input limits, and the solution has a linear feedback form.
+Once constraints are introduced, this global linear structure is lost, and the control law becomes
+more intricate.
+
+\section{Quadratic-cost CFTOC and quadratic programming}
+
+We first consider the constrained finite-horizon problem with quadratic stage and terminal cost:
+\[
+J^\star(x(k))
+=
+\min_{U}
+x_N^\top P x_N + \sum_{i=0}^{N-1}\left(x_i^\top Q x_i + u_i^\top R u_i\right)
+\]
+subject to
+\[
+x_{i+1}=Ax_i+Bu_i,\qquad i=0,\dots,N-1,
+\]
+\[
+x_i\in\cX,\qquad u_i\in\cU,\qquad i=0,\dots,N-1,
+\]
+\[
+x_N\in\cX_f,
+\qquad
+x_0=x(k).
+\]
+Because the dynamics are linear, the constraints are polyhedral, and the cost is quadratic, this
+problem can be rewritten as a quadratic program. This is one of the most important structural
+facts in nominal linear MPC.
+
+\subsection{QP formulation without eliminating the states}
+
+A first way to rewrite the quadratic-cost CFTOC problem as a quadratic program is to
+\emph{keep the predicted states as decision variables} and impose the system dynamics as
+explicit equality constraints. This formulation is often attractive in practice because it preserves
+the sparse structure of the dynamics.\\
+Starting from
+\[
+J^\star(x(k))
+=
+\min_U
+x_N^\top P x_N + \sum_{i=0}^{N-1}\left(x_i^\top Q x_i + u_i^\top R u_i\right)
+\]
+subject to
+\[
+x_{i+1}=Ax_i+Bu_i,\qquad i=0,\dots,N-1,
+\]
+\[
+x_i\in\cX,\qquad u_i\in\cU,\qquad i=0,\dots,N-1,
+\]
+\[
+x_N\in\cX_f,\qquad x_0=x(k),
+\]
+we introduce the stacked decision vector
+\[
+z=
+\begin{bmatrix}
+x_1^\top & \dots & x_N^\top & u_0^\top & \dots & u_{N-1}^\top
+\end{bmatrix}^\top .
+\]
+With this choice of variables, the CFTOC problem can be transformed into a QP of the form
+\[
+J^\star(x(k))
+=
+\min_z
+\begin{bmatrix}
+z^\top & x(k)^\top
+\end{bmatrix}
+\begin{bmatrix}
+\bar H & 0\\
+0 & Q
+\end{bmatrix}
+\begin{bmatrix}
+z\\
+x(k)
+\end{bmatrix}
+\]
+subject to
+\[
+G_{\mathrm{in}} z \le w_{\mathrm{in}} + E_{\mathrm{in}}x(k),
+\qquad
+G_{\mathrm{eq}} z = E_{\mathrm{eq}}x(k).
+\]
+The equality constraints come directly from the dynamics
+\[
+x_{i+1}=Ax_i+Bu_i.
+\]
+Collecting them over the whole horizon gives
+\[
+G_{\mathrm{eq}} z = E_{\mathrm{eq}}x(k),
+\]
+with the block structure
+\[
+G_{\mathrm{eq}}=
+\begin{bmatrix}
+I      & 0      & \cdots & 0      & -B     & 0      & \cdots & 0\\
+-A     & I      & \cdots & 0      & 0      & -B     & \cdots & 0\\
+0      & -A     & \ddots & \vdots & \vdots & \ddots & \ddots & \vdots\\
+\vdots & \ddots & \ddots & I      & 0      & \cdots & 0      & -B
+\end{bmatrix},
+\qquad
+E_{\mathrm{eq}}=
+\begin{bmatrix}
+A\\
+0\\
+\vdots\\
+0
+\end{bmatrix}.
+\]
+The first block row corresponds to
+\[
+x_1-Ax(k)-Bu_0=0,
+\]
+while the remaining rows encode
+\[
+x_{i+1}-Ax_i-Bu_i=0,\qquad i=1,\dots,N-1.
+\]
+Next, suppose the constraint sets are given in polyhedral form as
+\[
+\cX=\{x\mid A_xx\le b_x\},\qquad
+\cU=\{u\mid A_uu\le b_u\},\qquad
+\cX_f=\{x\mid A_fx\le b_f\}.
+\]
+Then all state, input, and terminal constraints can be collected into
+\[
+G_{\mathrm{in}} z \le w_{\mathrm{in}} + E_{\mathrm{in}}x(k).
+\]
+The matrix \(G_{\mathrm{in}}\) has a block-diagonal structure, with the state constraints acting
+on \(x_1,\dots,x_{N-1}\), the terminal constraint acting on \(x_N\), and the input constraints
+acting on \(u_0,\dots,u_{N-1}\). Explicitly,
+\[
+G_{\mathrm{in}}=
+\begin{bmatrix}
+A_x & 0   & \cdots & 0   & 0   & 0   & \cdots & 0\\
+0   & A_x & \cdots & 0   & 0   & 0   & \cdots & 0\\
+\vdots & \vdots & \ddots & \vdots & \vdots & \vdots & \ddots & \vdots\\
+0   & 0   & \cdots & A_x & 0   & 0   & \cdots & 0\\
+0   & 0   & \cdots & A_f & 0   & 0   & \cdots & 0\\[0.3em]
+0   & 0   & \cdots & 0   & A_u & 0   & \cdots & 0\\
+0   & 0   & \cdots & 0   & 0   & A_u & \cdots & 0\\
+\vdots & \vdots &  & \vdots & \vdots & \vdots & \ddots & \vdots\\
+0   & 0   & \cdots & 0   & 0   & 0   & \cdots & A_u
+\end{bmatrix},
+\]
+\[
+w_{\mathrm{in}}=
+\begin{bmatrix}
+b_x\\
+b_x\\
+\vdots\\
+b_x\\
+b_f\\
+b_u\\
+b_u\\
+\vdots\\
+b_u
+\end{bmatrix},
+\qquad
+E_{\mathrm{in}}=
+\begin{bmatrix}
+-A_x\\
+0\\
+\vdots\\
+0
+\end{bmatrix}.
+\]
+The term \(E_{\mathrm{in}}x(k)\) appears because the initial state constraint \(x_0\in\cX\) is not
+part of the decision vector \(z\), so its contribution must be written separately on the
+right-hand side.\\
+Finally, the cost is obtained directly from
+\[
+x_N^\top P x_N+\sum_{i=0}^{N-1}\left(x_i^\top Qx_i+u_i^\top Ru_i\right).
+\]
+Since \(x_0=x(k)\) is fixed and not optimized over, the quadratic term in the optimization
+variables is described by the block-diagonal matrix
+\[
+\bar H=
+\mathrm{blockdiag}(Q,\dots,Q,P,R,\dots,R),
+\]
+that is,
+\[
+\bar H=
+\begin{bmatrix}
+Q &        &        &        &        &        \\
+  & \ddots &        &        &        &        \\
+  &        & Q      &        &        &        \\
+  &        &        & P      &        &        \\
+  &        &        &        & R      &        \\
+  &        &        &        &        & \ddots \\
+  &        &        &        &        &        & R
+\end{bmatrix}.
+\]
+So the quadratic-cost CFTOC problem can be written as a standard QP in which the dynamics
+appear as equality constraints, the state and input limits appear as inequalities, and the cost is
+a quadratic function of the stacked state-input vector \(z\). This formulation stays very close to
+the original optimal control problem, since both predicted states and predicted inputs remain
+explicit throughout.
+\subsection{QP formulation by substitution}
+
+A second way to rewrite the quadratic-cost CFTOC problem as a quadratic program is to
+\emph{substitute the state equations} directly into the cost and the constraints, so that the only
+decision variables are the future inputs. In this formulation, one starts from
+\[
+x_{i+1}=Ax_i+Bu_i,\qquad x_0=x(k),
+\]
+and eliminates the predicted states \(x_1,\dots,x_N\) recursively.\\
+Define the stacked input vector
+\[
+U=
+\begin{bmatrix}
+u_0^\top & \cdots & u_{N-1}^\top
+\end{bmatrix}^\top.
+\]
+
+\paragraph{Step 1: Rewrite the cost.}
+
+After substituting the predicted states into the quadratic objective, the cost can be written as
+\[
+J(x(k),U)=U^\top H U + 2x(k)^\top F U + x(k)^\top Y x(k).
+\]
+Equivalently,
+\[
+J(x(k),U)=
+\begin{bmatrix}
+U^\top & x(k)^\top
+\end{bmatrix}
+\begin{bmatrix}
+H & F^\top\\
+F & Y
+\end{bmatrix}
+\begin{bmatrix}
+U\\
+x(k)
+\end{bmatrix}.
+\]
+Since the stage and terminal costs are assumed nonnegative, this block matrix satisfies
+\[
+\begin{bmatrix}
+H & F^\top\\
+F & Y
+\end{bmatrix}\succeq 0.
+\]
+
+\paragraph{Step 2: Rewrite the constraints compactly.}
+
+The input, state, and terminal constraints can also be expressed directly in terms of \(U\) and
+the current state \(x(k)\). This gives the compact inequality description
+\[
+GU \le w + Ex(k).
+\]
+To make this more explicit, suppose that
+\[
+\cX=\{x\mid A_xx\le b_x\},\qquad
+\cU=\{u\mid A_uu\le b_u\},\qquad
+\cX_f=\{x\mid A_fx\le b_f\}.
+\]
+Then the matrix \(G\), the vector \(E\), and the right-hand side \(w\) are obtained by stacking
+the input constraints first, then the state constraints along the horizon, and finally the terminal
+constraint. In block form,
+\[
+G=
+\begin{bmatrix}
+A_u & 0 & \cdots & 0\\
+0 & A_u & \cdots & 0\\
+\vdots & \vdots & \ddots & \vdots\\
+0 & 0 & \cdots & A_u\\
+0 & 0 & \cdots & 0\\
+A_xB & 0 & \cdots & 0\\
+A_xAB & A_xB & \cdots & 0\\
+\vdots & \vdots & \ddots & \vdots\\
+A_fA^{N-1}B & A_fA^{N-2}B & \cdots & A_fB
+\end{bmatrix},
+\]
+\[
+E=
+\begin{bmatrix}
+0\\
+0\\
+\vdots\\
+0\\
+-A_x\\
+-A_xA\\
+-A_xA^2\\
+\vdots\\
+-A_fA^N
+\end{bmatrix},
+\qquad
+w=
+\begin{bmatrix}
+b_u\\
+b_u\\
+\vdots\\
+b_u\\
+b_x\\
+b_x\\
+b_x\\
+\vdots\\
+b_f
+\end{bmatrix}.
+\]
+This compact form comes from writing each predicted state as an affine function of \(x(k)\) and
+the input sequence \(U\), and then imposing the polyhedral constraints on those expressions.
+
+\paragraph{Step 3: Rewrite the optimal control problem as a QP.}
+
+The quadratic-cost CFTOC problem therefore becomes
+\[
+J^\star(x(k))
+=
+\min_U
+\begin{bmatrix}
+U^\top & x(k)^\top
+\end{bmatrix}
+\begin{bmatrix}
+H & F^\top\\
+F & Y
+\end{bmatrix}
+\begin{bmatrix}
+U\\
+x(k)
+\end{bmatrix}
+\]
+subject to
+\[
+GU \le w + Ex(k).
+\]
+This is a quadratic program in the variable \(U\), parameterized by the current state \(x(k)\).
+For a given \(x(k)\), the optimal input sequence \(U^\star\) can therefore be obtained by solving
+this QP.
+
+\subsection{Quadratic-cost state-feedback solution}
+
+Consider again the quadratic program obtained after substitution:
+\[
+J^\star(x(k))
+=
+\min_U
+\begin{bmatrix}
+U^\top & x(k)^\top
+\end{bmatrix}
+\begin{bmatrix}
+H & F^\top\\
+F & Y
+\end{bmatrix}
+\begin{bmatrix}
+U\\
+x(k)
+\end{bmatrix}
+\]
+subject to
+\[
+GU \le w + Ex(k).
+\]
+For each fixed current state \(x(k)\), this problem can be solved numerically and yields an
+optimal input sequence
+\[
+U^\star(x(k))
+=
+\begin{bmatrix}
+u_0^\star(x(k))^\top & \cdots & u_{N-1}^\star(x(k))^\top
+\end{bmatrix}^\top.
+\]
+As in MPC only the first component of the optimal sequence is applied to the plant, the
+relevant feedback law is
+\[
+u_0^\star=\kappa(x(k)).
+\]
+The important point is that this QP is not just an optimization problem with state \(x(k)\)
+inserted into it numerically. It is a \emph{multiparametric quadratic program} (mp-QP), where
+the current state plays the role of a parameter. Because of this, the optimizer has a very
+specific structure as a function of the state.\\
+
+In particular, on the feasible set \(\mathcal X_0\), the first component of the optimal solution
+defines a map
+\[
+\kappa:\R^n\to\R^m,
+\]
+which is continuous and piecewise affine on polyhedra. More precisely, there exists a finite
+collection of polyhedral regions
+\[
+CR^j=\{x\in\R^n \mid H^j x \le K^j\},\qquad j=1,\dots,N^r,
+\]
+which form a partition of the feasible polyhedron \(\mathcal X_0\), such that on each region one
+has
+\[
+\kappa(x)=F^j x + g^j,\qquad x\in CR^j,\quad j=1,\dots,N^r.
+\]
+So even though the original optimal control problem is constrained and does not admit a single
+global linear feedback law, it still has a highly structured solution: the state space is divided
+into polyhedral regions, and on each region the optimal controller is affine.\\
+
+The optimal value function has a similarly regular form. The map \(J^\star(x(k))\), which
+assigns to each feasible initial state the optimal cost of the finite-horizon problem, is convex
+and piecewise quadratic on polyhedra. Thus, both the control law and the value function inherit
+a polyhedral structure from the parametric QP formulation.\\
+This observation is the starting point for \emph{explicit MPC}. Instead of solving the QP online
+at every sampling instant, one may compute offline the polyhedral partition together with the
+corresponding affine control laws. The online step is then reduced to locating the current state
+in the appropriate region and evaluating the affine formula associated with that region.
+
+\begin{theorembox}[Quadratic-cost state-feedback structure]
+For quadratic-cost CFTOC, the parametric optimization problem is an mp-QP. As a result, the
+first optimal input defines a continuous piecewise affine state-feedback law on the feasible set,
+while the associated optimal value function is convex and piecewise quadratic.
+\end{theorembox}
+\section{CFTOC with \(1\)-norm and \(\infty\)-norm costs}
+
+So far we have considered quadratic-cost CFTOC, which leads naturally to a quadratic
+program. One can treat alternative cost functions in a very similar
+predictive-control framework. In particular, if the stage and terminal penalties are based on the
+\(1\)-norm or the \(\infty\)-norm, the constrained finite time optimal control problem can be
+rewritten as a linear program.\\
+More precisely, consider the finite-horizon problem
+\[
+J^\star(x(k))
+=
+\min_U
+\norm{Px_N}_p+\sum_{i=0}^{N-1}\left(\norm{Qx_i}_p+\norm{Ru_i}_p\right),
+\qquad p\in\{1,\infty\},
+\]
+subject to
+\[
+x_{i+1}=Ax_i+Bu_i,\qquad i=0,\dots,N-1,
+\]
+\[
+x_i\in\mathcal X,\qquad u_i\in\mathcal U,\qquad i=0,\dots,N-1,
+\]
+\[
+x_N\in\mathcal X_f,
+\qquad
+x_0=x(k).
+\]
+The key point is that both the \(1\)-norm and the \(\infty\)-norm admit an equivalent
+\emph{epigraph formulation}, in which the norm is replaced by a linear objective together with
+additional linear inequalities. This is what makes it possible to transform the CFTOC problem
+into an LP.
+
+\subsection{\(\ell_\infty\)-minimization}
+
+To see the basic idea, it is useful to start from the simpler constrained minimization problem
+\[
+\min_{x\in\R^n}\norm{x}_\infty
+\qquad \text{subject to}\qquad
+Fx\le g.
+\]
+Since
+\[
+\norm{x}_\infty=\max\{|x_1|,\dots,|x_n|\},
+\]
+this problem can be viewed as the minimization of the maximum of finitely many linear
+functions:
+\[
+\min_{x\in\R^n}
+\max\{x_1,\dots,x_n,-x_1,\dots,-x_n\}
+\qquad \text{subject to}\qquad
+Fx\le g.
+\]
+The standard trick is then to introduce a scalar auxiliary variable \(t\) that upper-bounds all
+components in absolute value. This gives the equivalent problem
+\[
+\min_{x,t} t
+\]
+subject to
+\[
+x_i\le t,\qquad i=1,\dots,n,
+\]
+\[
+-x_i\le t,\qquad i=1,\dots,n,
+\]
+\[
+Fx\le g.
+\]
+In compact vector form, this can be written as
+\[
+\min_{x,t} t
+\]
+subject to
+\[
+-\mathbf 1\, t \le x \le \mathbf 1\, t,
+\qquad
+Fx\le g.
+\]
+Here \(\mathbf 1\) denotes the vector of ones. The constraint
+\[
+-\mathbf 1\, t \le x \le \mathbf 1\, t
+\]
+simply says that every component of \(x\) must satisfy \(|x_i|\le t\), so the scalar \(t\)
+bounds the absolute value of all entries simultaneously. Minimizing \(t\) is therefore exactly
+the same as minimizing \(\norm{x}_\infty\).\\
+The \(\infty\)-norm is replaced by a linear cost in an
+additional scalar variable together with linear inequalities. The problem is no longer written in
+terms of a norm objective, but it has become a linear program.
+
+\subsection{\(\ell_1\)-minimization}
+
+The same idea works for the \(1\)-norm. Consider
+\[
+\min_{x\in\R^n}\norm{x}_1
+\qquad \text{subject to}\qquad
+Fx\le g.
+\]
+Since
+\[
+\norm{x}_1=\sum_{i=1}^n |x_i|,
+\]
+one may write this as
+\[
+\min_{x\in\R^n}
+\sum_{i=1}^n \max\{x_i,-x_i\}
+\qquad \text{subject to}\qquad
+Fx\le g.
+\]
+Now, instead of a single scalar epigraph variable, one introduces a vector
+\[
+t\in\R^n
+\]
+whose components bound the absolute value of the corresponding entries of \(x\). The problem
+becomes
+\[
+\min_{x,t} t_1+\cdots+t_n
+\]
+subject to
+\[
+x_i\le t_i,\qquad i=1,\dots,n,
+\]
+\[
+-x_i\le t_i,\qquad i=1,\dots,n,
+\]
+\[
+Fx\le g.
+\]
+In compact form,
+\[
+\min_{x,t} \mathbf 1^\top t
+\]
+subject to
+\[
+-t\le x\le t,
+\qquad
+Fx\le g.
+\]
+Again, \(\mathbf 1\) denotes the vector of ones. The constraint
+\[
+-t\le x\le t
+\]
+means that each component \(t_i\) bounds the absolute value of the corresponding component
+\(x_i\). At the optimum one therefore has \(t_i=|x_i|\), and minimizing \(\mathbf 1^\top t\)
+is equivalent to minimizing \(\norm{x}_1\).\\
+So in both cases the same mechanism is at work: one introduces additional variables and writes
+the norm minimization problem in epigraph form. This is exactly the step that later allows the
+finite-horizon control problem to be expressed as an LP.
+
+\subsection{Construction of the LP with substitution}
+
+Returning now to CFTOC, we can proceed exactly as in the quadratic case with
+substitution: one eliminates the predicted states and writes everything directly in terms of the
+current state \(x(k)\), the future inputs, and the auxiliary epigraph variables.\\
+For the \(\infty\)-norm case, one introduces scalar variables
+\[
+\varepsilon_i^x,\qquad i=0,\dots,N,
+\]
+and
+\[
+\varepsilon_i^u,\qquad i=0,\dots,N-1,
+\]
+which bound the norms of the weighted state and input terms. Using the substituted prediction
+formula for the states, the problem can be written equivalently as
+\[
+\min_z
+\varepsilon_0^x+\cdots+\varepsilon_N^x+\varepsilon_0^u+\cdots+\varepsilon_{N-1}^u
+\]
+subject to inequalities of the form
+\[
+-\mathbf 1_n\,\varepsilon_i^x
+\le
+\pm Q\!\left(A^i x_0+\sum_{j=0}^{i-1}A^jBu_{i-1-j}\right),
+\]
+\[
+-\mathbf 1_r\,\varepsilon_N^x
+\le
+\pm P\!\left(A^N x_0+\sum_{j=0}^{N-1}A^jBu_{N-1-j}\right),
+\]
+\[
+-\mathbf 1_m\,\varepsilon_i^u \le \pm Ru_i,
+\]
+together with the state, input, and terminal constraints
+\[
+A^i x_0+\sum_{j=0}^{i-1}A^jBu_{i-1-j}\in\mathcal X,
+\qquad
+u_i\in\mathcal U,
+\]
+\[
+A^N x_0+\sum_{j=0}^{N-1}A^jBu_{N-1-j}\in\mathcal X_f,
+\qquad
+x_0=x(k).
+\]
+The detailed block matrices are not especially illuminating in prose, but the important message
+is that after substitution and introduction of the epigraph variables, the entire problem has only
+a linear objective and linear constraints.\\
+This yields the standard LP form
+\[
+\min_z c^\top z
+\qquad \text{subject to}\qquad
+\bar G z \le \bar w + \bar S x(k),
+\]
+where the decision vector contains both the auxiliary variables and the input sequence:
+\[
+z
+:=
+\{\varepsilon_0^x,\dots,\varepsilon_N^x,\varepsilon_0^u,\dots,\varepsilon_{N-1}^u,
+u_0^\top,\dots,u_{N-1}^\top\}\in\R^s.
+\]
+The matrices can then be partitioned as in the slides:
+\[
+\bar G=
+\begin{bmatrix}
+G_\varepsilon & G_u\\
+0 & G
+\end{bmatrix},
+\qquad
+\bar S=
+\begin{bmatrix}
+S_\varepsilon\\
+S
+\end{bmatrix},
+\qquad
+\bar w=
+\begin{bmatrix}
+w_\varepsilon\\
+w
+\end{bmatrix}.
+\]
+For a given current state \(x(k)\), the optimal sequence \(U^\star\) can therefore be obtained
+by solving a linear program. The \(1\)-norm case works in exactly the same spirit; only the
+epigraph variables are vector-valued instead of scalar.
+
+\subsection{\(1\)-/\(\infty\)-norm state-feedback solution}
+
+Once the norm-based CFTOC problem has been written in the compact LP form
+\[
+\min_z c^\top z
+\qquad \text{subject to}\qquad
+\bar G z \le \bar w + \bar S x(k),
+\]
+the parametric structure of the optimizer becomes analogous to the quadratic case. The current
+state \(x(k)\) again enters as a parameter, so the problem is a \emph{multiparametric linear
+program} (mp-LP).\\
+As a consequence, the first component of the multiparametric solution defines a state-feedback
+law
+\[
+u_0^\star=\kappa(x(k)),\qquad \forall x(k)\in\mathcal X_0,
+\]
+where
+\[
+\kappa:\R^n\to\R^m
+\]
+is piecewise affine on polyhedra. More precisely, there exists a polyhedral partition
+\[
+CR^j=\{x\in\R^n\mid H^j x\le K^j\},\qquad j=1,\dots,N^r,
+\]
+of the feasible polyhedron \(\mathcal X_0\) such that
+\[
+\kappa(x)=F^j x + g^j,
+\qquad
+x\in CR^j,\quad j=1,\dots,N^r.
+\]
+If the optimizer is unique, this control law is continuous and piecewise affine. If the LP has
+multiple optimizers, one can still construct a piecewise affine control law, but uniqueness is no
+longer guaranteed automatically.\\
+The value function also reflects the underlying linear structure. In contrast with the quadratic
+case, where the value function is piecewise quadratic, in the LP case the optimal value
+\[
+J^\star(x(k))
+\]
+is convex and piecewise affine on polyhedra.
+
+\subsection{Solution properties: quadratic versus \(1\)-/\(\infty\)-norm cost}
+
+We conclude this part by contrasting the geometry of quadratic and linear costs. This
+comparison is useful because it explains why the value functions and optimizer properties differ.\\
+
+Let \(n\) denote the number of optimization variables. If the cost is quadratic and positive
+definite, then the solution is always unique whenever the problem is feasible. More precisely,
+the optimizer is either in the interior of the feasible set, in which case no inequality constraint
+is active, or on the boundary of the feasible set, in which case at least one constraint is active.\\
+For a linear cost, the situation is different. The problem may be unbounded. If it is bounded
+and the optimum is unique, then it is attained at a vertex of the feasible set, which means that
+at least \(n\) constraints are active. It may also happen that there is not a unique minimizer,
+but rather a whole set of optimal solutions; in that case at least one constraint is active and the
+optimum is attained along a face of the feasible polyhedron.\\
+
+So the difference between the two formulations is not only algebraic but also geometric. A
+strictly convex quadratic objective selects a unique point, while a linear objective may select an
+entire face. This is why quadratic-cost CFTOC leads to a convex piecewise quadratic value
+function and typically unique optimizers, whereas \(1\)-/\(\infty\)-norm CFTOC leads to a convex
+piecewise affine value function and may admit multiple optimal solutions.
+
+\begin{theorembox}[Norm-based CFTOC as an LP]
+If the stage and terminal costs are based on the \(1\)-norm or the \(\infty\)-norm, the CFTOC
+problem can be rewritten in epigraph form and transformed into a linear program. The resulting
+parametric problem is an mp-LP, whose first optimal input is piecewise affine on a polyhedral
+partition of the feasible set, while the value function is convex and piecewise affine.
+\end{theorembox}
+
+\section{Receding-horizon notation and control law}
+
+Consider the discrete-time model
+\[
+x(k+1)=Ax(k)+Bu(k),
+\qquad
+y(k)=Cx(k),
+\]
+with
+\[
+x(k)\in\mathcal X,\qquad u(k)\in\mathcal U,\qquad \forall k\ge 0.
+\]
+Up to this point, we have mostly written the constrained finite time optimal control problem in
+a compact form that suppresses the prediction origin. For MPC, however, it is useful to make
+this dependence explicit, since the optimization problem is solved repeatedly at successive time
+instants.
+
+\subsection{CFTOC problem solved at time \(k\)}
+
+At time \(k\), the constrained finite time optimal control problem is written as
+\[
+J_{k\to k+N|k}^\star(x(k))
+=
+\min_{U_{k\to k+N|k}}
+\terminalcost(x_{k+N|k})
++
+\sum_{i=0}^{N-1}
+\stagecost(x_{k+i|k},u_{k+i|k})
+\]
+subject to
+\[
+x_{k+i+1|k}=Ax_{k+i|k}+Bu_{k+i|k},
+\qquad i=0,\dots,N-1,
+\]
+\[
+x_{k+i|k}\in\mathcal X,\qquad u_{k+i|k}\in\mathcal U,
+\qquad i=0,\dots,N-1,
+\]
+\[
+x_{k+N|k}\in\mathcal X_f,
+\]
+\[
+x_{k|k}=x(k),
+\]
+where the decision sequence is
+\[
+U_{k\to k+N|k}
+=
+\{u_{k|k},\dots,u_{k+N-1|k}\}.
+\]
+So the problem is solved at time \(k\), starting from the currently measured or estimated state
+\(x(k)\), and it produces an optimal input sequence over the horizon \(k,\dots,k+N-1\).
+
+\subsection{Meaning of the prediction notation}
+
+The notation is best understood carefully. The symbol \(x(k)\) denotes the actual state of the
+system at time \(k\). By contrast,
+\[
+x_{k+i|k}
+\]
+denotes the state predicted for time \(k+i\), where the prediction is made at time \(k\). This
+predicted state is obtained by starting from the current state
+\[
+x_{k|k}=x(k)
+\]
+and propagating the model forward using the planned inputs
+\[
+u_{k|k},\dots,u_{k+i-1|k}.
+\]
+For instance, the first predicted step is
+\[
+x_{k+1|k}=Ax_{k|k}+Bu_{k|k}.
+\]
+It is important to keep in mind that the same physical time instant may correspond to different
+predictions, depending on when the prediction is made. For example, \(x_{3|1}\) is the state
+predicted for time \(3\) using information available at time \(1\), whereas \(x_{3|2}\) is the state
+predicted for time \(3\) using information available at time \(2\). In general, these two
+quantities are different because they are based on different initial conditions and different input
+plans.\\
+Similarly,
+\[
+u_{k+i|k}
+\]
+is read as “the input at time \(k+i\), computed at time \(k\).” This notation keeps track of the
+fact that in MPC one computes an entire future plan, even though not all of it will actually be
+implemented.
+
+\subsection{From the optimal sequence to the applied input}
+
+Let
+\[
+U_{k\to k+N|k}^\star
+=
+\{u_{k|k}^\star,\dots,u_{k+N-1|k}^\star\}
+\]
+denote the optimal solution of the CFTOC problem solved at time \(k\). Although this optimal
+sequence contains \(N\) future control moves, only its first element is applied to the plant:
+\[
+u(k)=u_{k|k}^\star(x(k)).
+\]
+This is the defining feature of receding-horizon control. The optimizer computes a whole
+sequence, but the controller implements only the first input and discards the rest after one
+sampling interval.
+
+At the next time instant, the state is updated to
+\[
+x_{k+1|k+1}=x(k+1),
+\]
+and the optimization problem is solved again from this new initial condition. In this way, the
+controller continuously replans as new state information becomes available.
+
+\subsection{Receding-horizon control law and closed loop}
+
+The first optimal move defines the receding-horizon feedback law
+\[
+\kappa_k(x(k)) = u_{k|k}^\star(x(k)).
+\]
+The corresponding closed-loop system is therefore
+\[
+x(k+1)=Ax(k)+B\kappa_k(x(k))=:g_{\mathrm{cl}}(x(k)),
+\qquad k\ge 0.
+\]
+So even though the optimization problem is finite-horizon and open-loop in its internal
+prediction, the repeated re-solution at each step turns the overall control scheme into a
+feedback controller.
+
+\subsection{Time-invariant systems}
+
+If the system, the constraints, and the cost function are time-invariant, then the CFTOC
+problem has the same structure at every time \(k\). In that case, the feedback law obtained by
+receding-horizon optimization also becomes time-invariant, and the notation can be simplified.\\
+One then writes
+\[
+J^\star(x(k))
+=
+\min_U
+\terminalcost(x_N)
++
+\sum_{i=0}^{N-1}\stagecost(x_i,u_i)
+\]
+subject to
+\[
+x_{i+1}=Ax_i+Bu_i,\qquad i=0,\dots,N-1,
+\]
+\[
+x_i\in\mathcal X,\qquad u_i\in\mathcal U,\qquad i=0,\dots,N-1,
+\]
+\[
+x_N\in\mathcal X_f,
+\qquad
+x_0=x(k),
+\]
+where
+\[
+U=\{u_0,\dots,u_{N-1}\}.
+\]
+In the same spirit, the control law is written simply as
+\[
+u(k)=\kappa(x(k))
+\]
+instead of \(\kappa_k(x(k))\).
+
+\begin{theorembox}[Receding-horizon principle]
+At each sampling instant, MPC solves a finite-horizon optimal control problem, applies only the
+first element of the optimal input sequence, and then repeats the optimization at the next time
+step using the new state. This repeated re-optimization is what gives MPC its feedback nature.
+\end{theorembox}
+\section{Summary}
+
+Constrained finite time optimal control is the optimization problem at the heart of nominal
+MPC. Starting from a linear discrete-time model, one predicts future trajectories over a finite
+horizon, penalizes those trajectories through a chosen cost function, and imposes state, input,
+and terminal constraints explicitly. The resulting feasible set consists of the initial states from
+which at least one admissible predicted trajectory exists.\\
+
+When the cost is quadratic and the constraints are polyhedral, the problem can be written as a
+convex quadratic program. This may be done either by keeping the state variables explicitly and
+enforcing the dynamics as equality constraints, or by substituting the dynamics and optimizing
+only over the input sequence. In the parametric viewpoint, the first optimal input is a piecewise
+affine function of the state and the value function is piecewise quadratic.\\
+
+When the cost is based on the \(1\)-norm or the \(\infty\)-norm, auxiliary epigraph variables allow
+the problem to be rewritten as a linear program. In that case the first optimal input is again
+piecewise affine, but the value function becomes piecewise affine and multiple optimal solutions
+may occur.\\
+
+Finally, the finite-horizon problem is embedded into a closed-loop strategy through the
+receding-horizon principle. At each sampling instant, one solves a CFTOC problem from the
+current state, applies only the first input of the optimal sequence, and then repeats the same
+procedure at the next time step. This is the basic operational mechanism of model predictive
+control.

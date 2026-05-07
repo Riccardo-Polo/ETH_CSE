@@ -1,0 +1,619 @@
+\section{Objectives of constrained control}
+
+In the previous chapter we formulated the constrained finite time optimal control problem that lies
+at the core of nominal MPC. However, solving a finite-horizon problem at one instant is only part
+of the story. In closed loop, one wants the controller to keep generating admissible inputs over time,
+so that the state and input constraints are never violated. This naturally leads to the question of
+which initial states are \emph{safe} in the sense that constraint satisfaction can be maintained forever.\\
+
+Consider a general discrete-time system
+\[
+x(k+1)=g(x(k),u(k)),
+\]
+with state and input constrained to lie in sets
+\[
+x(k)\in \cX,\qquad u(k)\in \cU.
+\]
+A control law \(u(k)=\kappa(x(k))\) should ideally achieve several goals at once. First, it should
+respect the constraints for all time. Second, it should stabilize the system, typically to the origin
+or to a desired equilibrium. Third, among all admissible closed-loop behaviors, it should optimize
+a suitable performance criterion. Finally, one would like the controller to work from as large a set
+of initial conditions as possible.\\
+
+In this chapter we focus on the first of these goals: persistent constraint satisfaction. This is the
+role of invariant and control invariant sets. Roughly speaking, an invariant set describes a region in
+which the system can remain forever once it enters it, while a control invariant set describes a region
+from which one can always choose an admissible input that keeps the system inside that region.
+These notions are fundamental in MPC because they formalize the idea of long-term feasibility.
+
+A simple way to understand why such sets matter is to compare linear feedback with predictive
+control in the presence of hard constraints. Even if an unconstrained linear controller stabilizes the
+system, its region of safe operation may be very small once actuator limits are imposed. Outside
+that region, either the input saturates immediately or the state evolves in such a way that future
+constraint violations become unavoidable. Nonlinear constrained controllers, and in particular MPC,
+are attractive precisely because they can enlarge the set of initial states from which the constraints
+can be respected indefinitely.
+
+\section{Invariance}
+
+\subsection{Positively invariant sets}
+
+We begin with the autonomous case. Consider the system
+\[
+x(k+1)=g(x(k)),
+\]
+or, more generally, a closed-loop system obtained after fixing a feedback law \(\kappa\),
+\[
+x(k+1)=g(x(k),\kappa(x(k))).
+\]
+The central question is the following: for which initial states does the trajectory remain inside the
+constraint set \(\cX\) for all future times?
+
+\begin{theorembox}[Positively invariant sets]
+A set \(\mathcal O\subseteq \R^n\) is called a \emph{positively invariant set} for the autonomous system
+\(x(k+1)=g(x(k))\) if
+\[
+x(k)\in \mathcal O \quad \Longrightarrow \quad x(k+1)\in \mathcal O
+\qquad \forall k\in \{0,1,2,\dots\}.
+\] 
+\end{theorembox}
+
+Thus, once the state starts inside \(\mathcal O\), all future states remain inside \(\mathcal O\) as well.
+If in addition \(\mathcal O\subseteq \cX\), then \(\mathcal O\) provides a set of initial conditions from
+which the trajectory never violates the state constraints.\\
+Among all positively invariant sets contained in the constraint set \(\cX\), one is especially important.
+
+\begin{theorembox}[Maximal positively invariant set]
+The set \(\mathcal O_\infty\subseteq \cX\) is called the \emph{maximal positively invariant set} with
+respect to \(\cX\) if
+\[
+\mathcal O_\infty \text{ is positively invariant}
+\]
+and
+\[
+\mathcal O \subseteq \mathcal O_\infty
+\qquad
+\text{for every positively invariant set } \mathcal O \subseteq \cX.
+\]
+\end{theorembox}
+
+This set has a very natural interpretation: it is the set of all states for which the autonomous
+system can remain feasible forever once it is there. In that sense, \(\mathcal O_\infty\) is the largest
+region of perpetual constraint satisfaction for the given dynamics.
+
+\subsection{Pre-sets}
+
+To study invariance, it is useful to introduce a one-step backward reachability notion.
+
+\begin{theorembox}[Pre-set]
+Given a set \(S\) and the dynamic system
+\[
+x(k+1)=g(x(k)),
+\]
+the \emph{pre-set} of \(S\) is the set of states that evolve into the target set \(S\) in one time step:
+\[
+\operatorname{pre}(S):=\{x \mid g(x)\in S\}.
+\]
+\end{theorembox}
+
+So, if \(S\) is the set of states we would like to be in at the next time instant, then
+\(\operatorname{pre}(S)\) is the set of states from which this happens in one step. In other words,
+the pre-set tells us which current states are compatible with reaching the target set immediately
+under the given dynamics.
+
+This notion gives a very compact way to express invariance. Indeed, a set \(\mathcal O\) is positively
+invariant precisely when every state in \(\mathcal O\) is mapped back into \(\mathcal O\) after one step.
+That means exactly that every state in \(\mathcal O\) must belong to the pre-set of \(\mathcal O\).
+
+\begin{theorembox}[Geometric condition for invariance]
+A set \(\mathcal O\) is a positively invariant set if and only if
+\[
+\mathcal O \subseteq \operatorname{pre}(\mathcal O).
+\]
+Equivalently,
+\[
+\operatorname{pre}(\mathcal O)\cap \mathcal O = \mathcal O.
+\]
+\end{theorembox}
+The proof is immediate and is conveniently written through the contrapositive in both directions.
+If \(\mathcal O \not\subseteq \operatorname{pre}(\mathcal O)\), then there exists some
+\(\bar x\in \mathcal O\) such that \(\bar x\notin \operatorname{pre}(\mathcal O)\). By definition of
+the pre-set, this means \(g(\bar x)\notin \mathcal O\), so \(\mathcal O\) is not positively invariant.
+Conversely, if \(\mathcal O\) is not positively invariant, then there exists some \(\bar x\in \mathcal O\)
+such that \(g(\bar x)\notin \mathcal O\). Again by definition of the pre-set, this implies
+\(\bar x\notin \operatorname{pre}(\mathcal O)\), and therefore
+\(\mathcal O\not\subseteq \operatorname{pre}(\mathcal O)\).\\
+
+For general nonlinear systems, computing pre-sets can be very difficult. Even if the target set \(S\)
+has a simple description, the set of all states that reach it in one time step may have a complicated
+shape. Only in special cases, most notably for linear systems with suitably described constraint
+sets, does the computation become tractable.
+
+\subsection{Linear autonomous systems}
+
+For linear autonomous dynamics
+\[
+x(k+1)=Ax(k),
+\]
+the pre-set becomes much easier to describe. If the target set is a polyhedron
+\[
+S=\{x\in \R^n \mid Fx\leq f\},
+\]
+then
+\[
+\operatorname{pre}(S)
+=
+\{x\in \R^n \mid Ax\in S\}
+=
+\{x\in \R^n \mid FAx\leq f\}.
+\]
+So for linear systems the pre-set of a polyhedron is again a polyhedron. This closure property is
+the key reason why polyhedral invariant-set computations are possible.
+
+\subsection{Conceptual computation of the maximal invariant set}
+
+The maximal positively invariant set can be characterized by a simple iterative construction.
+Starting from the full constraint set,
+\[
+\Omega_0 := \cX,
+\]
+one recursively removes all states that cannot remain in the current set after one time step. This
+leads to the iteration
+\[
+\Omega_{i+1}:=\operatorname{pre}(\Omega_i)\cap \Omega_i.
+\]
+Since \(\Omega_{i+1}\) is obtained by intersecting \(\Omega_i\) with the set of states that return to
+\(\Omega_i\) in one step, the sequence is nested:
+\[
+\Omega_{i+1}\subseteq \Omega_i, \qquad \forall i\in\mathbb N.
+\]
+Thus, at each step, one removes the states that cannot be kept inside the current candidate set.\\
+The interpretation is very natural. At the first iteration one discards all states in \(\cX\) that leave
+\(\cX\) after one transition. At the second iteration one discards all states that enter the already
+discarded region after one transition, and so on. If the procedure reaches a fixed point, that fixed
+point is precisely the maximal positively invariant set.
+
+\begin{theorembox}[Conceptual algorithm to compute the maximal invariant set]
+\textbf{Input:} \(g,\cX\)\\
+\textbf{Output:} \(\mathcal O_\infty\)
+
+\[
+\begin{array}{l}
+\Omega_0 \leftarrow \cX \\[0.3em]
+\textbf{loop} \\[0.2em]
+\qquad \Omega_{i+1} \leftarrow \operatorname{pre}(\Omega_i)\cap \Omega_i \\[0.2em]
+\qquad \textbf{if } \Omega_{i+1}=\Omega_i \textbf{ then} \\[0.2em]
+\qquad\qquad \textbf{return } \mathcal O_\infty=\Omega_i \\[0.2em]
+\qquad \textbf{end if} \\[0.2em]
+\textbf{end loop}
+\end{array}
+\]
+\end{theorembox}
+
+So, if for some finite index \(i\) the iteration satisfies
+\[
+\Omega_{i+1}=\Omega_i,
+\]
+then the algorithm has converged and the limit set is
+\[
+\mathcal O_\infty=\Omega_i.
+\]
+This set is the largest positively invariant subset of \(\cX\).\\
+In practice, each iteration requires several set operations: one must represent the current set
+\(\Omega_i\), compute its pre-set, intersect sets, and check whether the procedure has converged.
+These operations are manageable in some structured settings, especially for linear systems with
+polyhedral sets, but they can become much more difficult in general nonlinear problems.
+
+\section{Control invariance}
+
+\subsection{Definition and meaning}
+
+In the autonomous setting, the evolution is fixed once the current state is known. In control, by
+contrast, we can influence the next state through the input. This leads to a more flexible notion.\\
+Consider the controlled system
+\[
+x(k+1)=g(x(k),u(k)),
+\]
+subject to the constraints
+\[
+x(k)\in \cX,\qquad u(k)\in \cU.
+\]
+\begin{theorembox}[Control invariant sets]
+A set \(\mathcal C\subseteq \cX\) is called a \emph{control invariant set} if
+\[
+x(k)\in \mathcal C
+\quad \Longrightarrow \quad
+\exists\,u(k)\in \cU \text{ such that } g(x(k),u(k))\in \mathcal C
+\]
+for all \(k\in \mathbb N\).
+\end{theorembox}
+
+This definition differs from positive invariance in one essential way: it does not require that the
+next state remains in the set under a fixed autonomous evolution, but only that there \emph{exists}
+an admissible control action that keeps the successor state in the set. Therefore control invariance
+captures the states from which constraint satisfaction can be maintained indefinitely by choosing
+the input appropriately.\\
+The largest such set plays the same role as before.
+
+\begin{theorembox}[Maximal control invariant set]
+The set \(\mathcal C_\infty\subseteq \cX\) is called the \emph{maximal control invariant set} for the
+system \(x(k+1)=g(x(k),u(k))\) under the constraints \((x,u)\in \cX\times \cU\) if it is control
+invariant and contains every control invariant set contained in \(\cX\).
+\end{theorembox}
+
+Thus \(\mathcal C_\infty\) is the best any controller can do in terms of perpetual constraint
+satisfaction. If \(x(0)\in \mathcal C_\infty\), then there exists at least one admissible control strategy
+that keeps the system feasible forever. If \(x(0)\notin \mathcal C_\infty\), then no controller can
+guarantee this.
+
+\subsection{Controlled pre-sets}
+
+The pre-set concept extends naturally to systems with inputs. Given a target set \(S\subseteq \R^n\),
+we define
+\[
+\operatorname{pre}(S):=
+\{x\in \R^n \mid \exists\,u\in \cU \text{ such that } g(x,u)\in S\}.
+\]
+So the pre-set now contains all states from which it is \emph{possible} to drive the system into \(S\)
+in one step using an admissible input.\\
+With this definition, the geometric condition for control invariance has exactly the same form as
+before.
+
+\begin{theorembox}[Geometric condition for control invariance]
+A set \(\mathcal C\) is control invariant if and only if
+\[
+\mathcal C \subseteq \operatorname{pre}(\mathcal C).
+\]
+\end{theorembox}
+
+Accordingly, the same conceptual fixed-point iteration can be used:
+\[
+\Omega_0:=\cX,
+\qquad
+\Omega_{i+1}:=\operatorname{pre}(\Omega_i)\cap \Omega_i.
+\]
+If the iteration converges in finite time, the fixed point is the maximal control invariant set
+\(\mathcal C_\infty\).\\
+
+Conceptually this is identical to the autonomous case, but computationally it is much harder,
+because the controlled pre-set involves existential quantification over the input. In other words,
+one must determine not only where the state goes, but whether there exists an admissible input
+that drives it into the target set.
+
+\subsection{Linear systems and projection}
+
+For the linear system
+\[
+x(k+1)=Ax(k)+Bu(k),
+\]
+with input constraints
+\[
+\cU=\{u\in \R^m \mid Gu\leq g\},
+\]
+and target set
+\[
+S=\{x\in \R^n \mid Fx\leq f\},
+\]
+the controlled pre-set is
+\[
+\operatorname{pre}(S)
+=
+\{x\in \R^n \mid \exists\,u\in \cU \text{ such that } Ax+Bu\in S\}.
+\]
+Equivalently,
+\[
+\operatorname{pre}(S)
+=
+\left\{
+x\in \R^n \,\middle|\,
+\exists\,u\in \R^m:
+\begin{bmatrix}
+FA & FB\\
+0 & G
+\end{bmatrix}
+\begin{bmatrix}
+x\\u
+\end{bmatrix}
+\leq
+\begin{bmatrix}
+f\\g
+\end{bmatrix}
+\right\}.
+\]
+This description shows that the controlled pre-set is obtained by projecting a higher-dimensional
+polyhedron in the \((x,u)\)-space onto the \(x\)-space. That projection step is the main source of
+computational difficulty.\\
+Still, the conceptual meaning is very clear. In the autonomous case, each state has only one
+possible successor. In the controlled case, each state is associated with an entire set of possible
+successors, one for each admissible input. This makes the controlled pre-set much larger, but also
+much more difficult to compute.
+
+\subsection{From a control invariant set to a control law}
+
+A control invariant set is not just a geometric object: it can be used directly to synthesize a control
+law that guarantees constraint satisfaction. Suppose \(\mathcal C\) is control invariant. Then for every
+\(x\in \mathcal C\) there exists at least one input \(u\in \cU\) such that the next state remains in
+\(\mathcal C\). One can therefore define a feedback law by selecting, at each state, one admissible
+input with this property. A generic construction is
+\[
+\kappa(x)
+:=
+\argmin_{u}
+\left\{
+f(x,u)\ \middle|\ g(x,u)\in \mathcal C,\ u\in \cU
+\right\},
+\]
+where \(f\) can be any objective function, even \(f(x,u)=0\) if one only wants feasibility.\\
+If \(\kappa(x)\in \cU\) for all \(x\in \mathcal C\) and
+\[
+g(x,\kappa(x))\in \mathcal C \qquad \forall x\in \mathcal C,
+\]
+then the closed-loop system remains in \(\mathcal C\) forever, and therefore the constraints are
+satisfied for all time.\\
+This construction guarantees feasibility, but not necessarily convergence. Stability requires
+additional ingredients. This is precisely where MPC enters: it augments feasibility with an optimal
+control objective and suitable terminal conditions so as to recover both constraint satisfaction and
+closed-loop stability.
+
+\section{Relation to MPC}
+
+Invariant and control invariant sets are fundamental in MPC, but one rarely computes the maximal
+control invariant set explicitly in realistic problems. The reason is not conceptual but computational.
+Even for constrained linear systems, exact computation of maximal control invariant sets can become
+very complex. For nonlinear systems it is usually far harder.\\
+
+This difficulty explains one of the deep ideas behind MPC. Instead of trying to compute the largest
+control invariant region once and for all, MPC solves a tractable finite-horizon optimization problem
+at each sampling instant. In doing so, it implicitly describes a control invariant behavior in a form
+that is much easier to represent and compute online. Terminal ingredients such as invariant terminal
+sets are then used to connect the finite-horizon problem with the infinite-horizon feasibility and
+stability properties one would ideally like to have.
+
+\begin{theorembox}[Control invariance and MPC]
+A maximal control invariant set tells us the largest region from which some admissible controller can
+keep the constraints satisfied forever. MPC can be viewed as a tractable way of realizing this idea
+indirectly, without having to compute that maximal set explicitly.
+\end{theorembox}
+
+\section{Practical computation of invariant sets}
+
+\subsection{Polyhedra and polytopes}
+
+For computational purposes, invariant sets are often represented as polyhedra. A polyhedron is the
+intersection of finitely many halfspaces and can be written as
+\[
+P=\{x\in \R^n \mid Ax\leq b\}.
+\]
+If \(P\) is bounded, it is called a \emph{polytope}. In linear MPC this is the natural set class,
+because state, input, and terminal constraints are often given by linear inequalities.\\
+A complementary viewpoint is given by the convex hull representation. If \(v_1,\dots,v_s\in \R^n\),
+their convex hull is
+\[
+\operatorname{co}\{v_1,\dots,v_s\}
+=
+\left\{
+x=\sum_{i=1}^s \lambda_i v_i
+\ \middle|\
+\lambda_i\geq 0,\ \sum_{i=1}^s \lambda_i=1
+\right\}.
+\]
+The Minkowski--Weyl theorem states that a set is a polytope if and only if it can be represented
+both as a bounded intersection of finitely many halfspaces and as the convex hull of finitely many
+points. In computations, one switches between these two descriptions depending on which set
+operation must be performed.
+
+\subsection{Common constraints in MPC}
+
+Many constraints that appear in MPC are naturally polytopic. Simple box constraints on inputs and
+outputs,
+\[
+u_{\mathrm{low}}\leq u(k)\leq u_{\mathrm{high}},
+\qquad
+y_{\mathrm{low}}\leq y(k)\leq y_{\mathrm{high}},
+\]
+can be written as linear inequalities in the stacked vector \(\begin{bmatrix}x(k)\\u(k)\end{bmatrix}\).
+Likewise, magnitude constraints such as
+\[
+\norm{Cx(k)}_\infty \leq \alpha
+\]
+and rate constraints such as
+\[
+\norm{x(k+1)-x(k)}_\infty \leq \alpha
+\]
+are also polyhedral. This is why polytopes are such a natural computational language in linear
+MPC.
+
+\subsection{Intersection and subset tests}
+
+The iterative computation of invariant sets relies repeatedly on two basic operations: intersection
+and equality testing.
+
+If
+\[
+S=\{x\in \R^n \mid Cx\leq c\},
+\qquad
+T=\{x\in \R^n \mid Dx\leq d\},
+\]
+then their intersection is obtained simply by stacking inequalities:
+\[
+S\cap T
+=
+\left\{
+x\in \R^n \,\middle|\,
+\begin{bmatrix}
+C\\D
+\end{bmatrix}x
+\leq
+\begin{bmatrix}
+c\\d
+\end{bmatrix}
+\right\}.
+\]
+So intersection is easy in inequality form.
+
+Testing whether one polytope is contained in another is more subtle. Suppose
+\[
+P=\{x\in \R^n \mid Cx\leq c\},
+\qquad
+Q=\{x\in \R^n \mid Dx\leq d\}.
+\]
+To check whether \(P\subseteq Q\), it is enough to verify each inequality defining \(Q\).
+Let \(D_i\) denote the \(i\)-th row of \(D\). Then \(P\subseteq Q\) holds if and only if
+\[
+\max_{x}\ D_i x
+\quad \text{subject to } Cx\leq c
+\]
+is at most \(d_i\) for every row \(i\). This maximum is the support function of \(P\) in the
+direction \(D_i\):
+\[
+h_P(D_i):=\max_x\ D_i x \quad \text{subject to } Cx\leq c.
+\]
+Therefore
+\[
+P\subseteq Q
+\qquad \Longleftrightarrow \qquad
+h_P(D_i)\leq d_i \quad \text{for all } i.
+\]
+
+This subset test is important because equality of two polytopes can be checked through two
+containment relations:
+\[
+P=Q
+\qquad \Longleftrightarrow \qquad
+P\subseteq Q \text{ and } Q\subseteq P.
+\]
+
+\subsection{Polytopic invariant sets}
+
+For linear autonomous systems with polytopic constraints, the conceptual invariant-set algorithm
+becomes implementable. One represents each iterate \(\Omega_i\) as a polytope, computes the
+pre-set through linear inequality manipulation, intersects polytopes by stacking inequalities, and
+tests convergence through bidirectional subset checks.
+
+In principle, this allows one to obtain the maximal polyhedral invariant set. In practice, however,
+the number of inequalities can grow quickly with the state dimension and with the number of
+iterations. This is one of the main limitations of exact polyhedral computations in higher
+dimensions.
+
+\subsection{Ellipsoids and Lyapunov-based invariant sets}
+
+An alternative is to work with ellipsoids. Given a symmetric positive definite matrix \(P\in \R^{n\times n}\)
+and a center \(x_c\in \R^n\), the ellipsoid
+\[
+\mathcal E:=\{x\in \R^n \mid (x-x_c)^\top P (x-x_c)\leq 1\}
+\]
+has a fixed-complexity description: no matter how large the dimension is, containment can be
+checked through quadratic expressions rather than through arbitrarily many inequalities.
+
+This connects naturally with Lyapunov theory. Suppose \(V:\R^n\to \R\) is a Lyapunov function
+for the autonomous system
+\[
+x(k+1)=g(x(k)).
+\]
+Then every sublevel set
+\[
+Y_\alpha:=\{x\in \R^n \mid V(x)\leq \alpha\}
+\]
+is invariant. Indeed, if the state starts in \(Y_\alpha\), then the Lyapunov function decreases along
+the trajectory, so the state can never leave that sublevel set.
+
+For linear systems
+\[
+x(k+1)=Ax(k),
+\]
+a standard quadratic Lyapunov function is
+\[
+V(x)=x^\top P x,
+\]
+where \(P\succ 0\) satisfies
+\[
+A^\top P A - P \prec 0.
+\]
+Then the invariant sublevel sets are ellipsoids of the form
+\[
+Y_\alpha=\{x\in \R^n \mid x^\top P x\leq \alpha\}.
+\]
+Such sets are typically not maximal, unlike the exact polyhedral invariant set, but they are much
+easier to compute and scale better to larger dimensions.
+
+\subsection{Largest ellipsoid contained in a polytope}
+
+Suppose the state constraints are given by the polytope
+\[
+\cX=\{x\in \R^n \mid Fx\leq f\},
+\]
+and suppose \(V(x)=x^\top P x\) is a Lyapunov function. We want the largest ellipsoidal invariant
+set of the form
+\[
+Y_\alpha=\{x\in \R^n \mid x^\top P x\leq \alpha\}
+\]
+that is contained in \(\cX\).
+
+This means choosing the largest \(\alpha\geq 0\) such that
+\[
+Y_\alpha \subseteq \cX.
+\]
+Using the support function, this is equivalent to requiring
+\[
+h_{Y_\alpha}(F_i)\leq f_i
+\qquad \text{for all rows } F_i \text{ of } F.
+\]
+For an ellipsoid one can compute this support function explicitly:
+\[
+h_{Y_\alpha}(F_i)=\norm{P^{-1/2}F_i^\top}\sqrt{\alpha}.
+\]
+Hence the inclusion condition becomes
+\[
+\norm{P^{-1/2}F_i^\top}\sqrt{\alpha}\leq f_i
+\qquad \forall i,
+\]
+or, equivalently,
+\[
+\alpha \leq \frac{f_i^2}{F_i P^{-1}F_i^\top}
+\qquad \forall i.
+\]
+Therefore the largest admissible value is
+\[
+\alpha^\star
+=
+\min_{i}
+\frac{f_i^2}{F_i P^{-1}F_i^\top}.
+\]
+This gives the largest Lyapunov ellipsoid of the chosen shape matrix \(P\) that is still fully
+contained in the constraints.
+
+The important message is that ellipsoidal invariant sets trade exactness for tractability. They are
+usually smaller than the maximal polyhedral invariant set, but they are easy to evaluate and can be
+computed efficiently even in higher dimensions.
+
+\section{Summary}
+
+Invariant and control invariant sets provide the right geometric language for infinite-horizon
+constraint satisfaction. A positively invariant set describes a region in which an autonomous or
+already closed-loop system remains forever once it enters it. A control invariant set describes a
+region in which one can always choose an admissible input that keeps the state inside the region.
+
+The maximal positively invariant set \(\mathcal O_\infty\) and the maximal control invariant set
+\(\mathcal C_\infty\) are the largest regions with these properties. They can be characterized through
+pre-sets and, at least conceptually, computed by the same fixed-point iteration
+\[
+\Omega_{i+1}=\operatorname{pre}(\Omega_i)\cap \Omega_i.
+\]
+For autonomous systems this iteration removes states that cannot remain feasible after one step.
+For controlled systems it removes states from which no admissible input can keep the trajectory
+feasible.
+
+In linear settings with polyhedral constraints, invariant-set computations can be carried out using
+polytopes. Intersections are easy in inequality form, while subset tests can be performed through
+support functions. Exact polyhedral invariant sets are very informative, but their complexity can
+grow quickly with dimension.
+
+Ellipsoidal invariant sets offer a more tractable alternative. When obtained from quadratic
+Lyapunov functions, they are invariant by construction and their size inside a polytopic constraint
+set can be computed explicitly. They are generally conservative compared with maximal polyhedral
+sets, but their complexity remains fixed and manageable.
+
+From the viewpoint of MPC, the key lesson is that invariant sets are not just auxiliary geometric
+objects. They are central tools for reasoning about long-term feasibility, and they form the bridge
+between finite-horizon optimization and infinite-horizon constraint satisfaction. In the next chapter,
+this bridge will be used to study recursive feasibility and stability of MPC.
