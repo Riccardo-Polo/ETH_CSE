@@ -1032,31 +1032,2368 @@ model, for example through tube-based MPC. The tools developed in this chapter, 
 invariance, disturbance reachable sets, Pontryagin difference, and constraint tightening, are the
 basic ingredients for those methods.
 
+\section{Closed-Loop Predictions}
+
+\subsection{Why open-loop robust predictions are conservative}
+
+The robust open-loop MPC formulation introduced in the previous section already provides a
+systematic way to guarantee constraint satisfaction under bounded additive disturbances.
+However, it does so by optimizing over a fixed future input sequence
+\[
+    U=\{u_0,\ldots,u_{N-1}\}.
+\]
+This means that, inside the prediction problem, the controller commits today to all future
+control moves. The future inputs are not allowed to depend on the disturbances that will be
+observed along the horizon.\\
+
+This assumption is conservative. In reality, MPC is implemented in closed loop: after applying
+the first input, the state is measured again and the optimization is solved again. Therefore, if a
+disturbance pushes the system away from the predicted trajectory, the controller will not blindly
+continue with the old plan. It will react to the new state. The open-loop robust prediction does
+not fully exploit this future feedback capability.\\
+A useful way to understand this point is to view robust MPC as a game between two players:
+the controller and the disturbance. At each time step, the controller selects an input and the
+disturbance selects an admissible perturbation. For the uncertain system
+\[
+    x(k+1)=g(x(k),u(k))+w(k),
+\]
+the true sequence of events is the following. The controller first applies \(u(k)\), the disturbance
+then realizes \(w(k)\), the new state is observed, and the controller chooses the next input based
+on this new state.\\
+
+In an open-loop robust prediction, instead, the controller chooses all future moves
+\[
+    u_0,\ldots,u_{N-1}
+\]
+at once, while the disturbance is allowed to choose an entire disturbance sequence after seeing
+the whole planned input sequence. In other words, the prediction assumes that the controller
+will do the same thing in the future no matter what the disturbance does. This is safe, but it
+does not reflect the way MPC actually uses feedback.
+
+\subsection{Control policies}
+
+A less conservative robust prediction should allow the future control moves to depend on the
+future states. Instead of optimizing over a sequence
+\[
+    \{u_0,u_1,\ldots,u_{N-1}\},
+\]
+one would like to optimize over a sequence of feedback policies
+\[
+    \{u_0,\mu_1(\cdot),\ldots,\mu_{N-1}(\cdot)\},
+\]
+where
+\[
+    \mu_i:\R^n\to\R^m
+\]
+maps the predicted state at time \(i\) to the input to be applied at time \(i\).\\
+
+The first input is still a single value, because the current state is known at the time the
+optimization problem is solved. The later inputs, however, should be functions. For instance,
+after the first disturbance \(w_0\) has occurred, the state
+\[
+    x_1=Ax_0+Bu_0+w_0
+\]
+is known, and the second input can be chosen as
+\[
+    u_1=\mu_1(x_1).
+\]
+Equivalently, since \(x_1\) is determined by the previous disturbance, one may regard \(u_1\) as
+a function of \(w_0\). At the next step, \(u_2\) may depend on \(w_0\) and \(w_1\), and so on.\\
+This idea captures the actual information pattern of closed-loop control. The difficulty is that
+one cannot optimize over arbitrary functions online. The set of all possible nonlinear policies is
+infinite-dimensional and far too complex for a tractable MPC formulation. Therefore, practical
+robust MPC methods impose a structure on the future policies.
+
+\subsection{Structured closed-loop predictions}
+
+Several structured policy classes can be used to introduce feedback into the prediction problem.
+A first possibility is to use a fixed \textbf{pre-stabilizing} feedback of the form
+\[
+    \mu_i(x_i)=Kx_i+v_i,
+\]
+where \(K\) is chosen offline such that \(A+BK\) is stable, and the optimizer only chooses the
+feedforward correction \(v_i\). This is simple and leads to a convex problem, but it can be
+conservative.\\
+
+A more general possibility is to optimize over \text{linear feedback} gains,
+\[
+    \mu_i(x_i)=K_i x_i+v_i.
+\]
+This gives more freedom, but the resulting optimization problem is generally nonconvex and
+therefore very difficult to solve online.\\
+
+Another important idea is \textbf{disturbance feedback}. In this case the future input is written as an
+affine function of the past disturbances:
+\[
+    \mu_i
+    =
+    v_i+\sum_{j=0}^{i-1}M_{ij}w_j.
+\]
+Although this is equivalent in expressive power to a class of linear state-feedback policies, it can
+lead to convex formulations. The drawback is that the number of decision variables may become
+large, making the method computationally demanding.\\
+
+The approach emphasized in this chapter is \textbf{tube MPC}. The future input is decomposed as
+\[
+    u_i=v_i+K(x_i-z_i),
+\]
+where \(z_i\) is a nominal state, \(v_i\) is a nominal input, and \(K\) is a fixed stabilizing
+feedback gain. The optimizer chooses the nominal trajectory and the nominal input sequence,
+while the feedback term \(K(x_i-z_i)\) keeps the real trajectory close to the nominal one.
+
+\section{Error Dynamics}
+
+\subsection{Splitting nominal planning and error correction}
+
+We consider again the disturbed linear system
+\[
+    x(k+1)=Ax(k)+Bu(k)+w(k),
+    \qquad
+    x(k)\in\mathcal X,\quad u(k)\in\mathcal U,\quad w(k)\in\mathcal W.
+\]
+The central idea is to split the available control authority into two parts. The first part plans
+a nominal trajectory for the noise-free system
+\[
+    z(k+1)=Az(k)+Bv(k).
+\]
+Here \(z(k)\) is the nominal state and \(v(k)\) is the nominal input. The second part is a local
+tracking controller that compensates for deviations between the real state and the nominal
+state. We write
+\[
+    u(k)=v(k)+K(x(k)-z(k)),
+\]
+where \(K\) is chosen offline so that
+\[
+    A_K:=A+BK
+\]
+is Schur stable.\\
+
+The optimization problem will choose the nominal trajectory and the nominal inputs. The
+feedback gain \(K\) is not optimized online. It is used to keep the real trajectory inside a tube
+around the nominal trajectory. This is what makes the resulting MPC problem tractable: the
+online optimization remains a nominal finite-horizon optimal control problem, but with tightened
+constraints that account for the possible tracking error.
+
+\subsection{Derivation of the error dynamics}
+
+Define the error between the real and nominal state as
+\[
+    e_i:=x_i-z_i.
+\]
+Using the feedback law
+\[
+    u_i=v_i+K(x_i-z_i)=v_i+Ke_i,
+\]
+and the nominal dynamics
+\[
+    z_{i+1}=Az_i+Bv_i,
+\]
+we obtain
+\[
+\begin{aligned}
+    e_{i+1}
+    &=
+    x_{i+1}-z_{i+1}                                                    \\
+    &=
+    \left(Ax_i+Bu_i+w_i\right)-\left(Az_i+Bv_i\right)                  \\
+    &=
+    Ax_i+B\left(v_i+K(x_i-z_i)\right)+w_i-Az_i-Bv_i                    \\
+    &=
+    (A+BK)(x_i-z_i)+w_i                                                \\
+    &=
+    A_K e_i+w_i.
+\end{aligned}
+\]
+Thus the error evolves according to the autonomous disturbed system
+\[
+    e_{i+1}=A_K e_i+w_i,
+    \qquad w_i\in\mathcal W.
+\]
+
+\begin{theorembox}[Error dynamics under tube feedback]
+If
+\[
+    u_i=v_i+K(x_i-z_i),
+    \qquad
+    z_{i+1}=Az_i+Bv_i,
+\]
+then the error \(e_i=x_i-z_i\) satisfies
+\[
+    e_{i+1}=A_K e_i+w_i,
+    \qquad A_K=A+BK.
+\]
+The nominal input \(v_i\) disappears from the error dynamics.
+\end{theorembox}
+
+This cancellation is fundamental. It means that the possible tracking errors are determined only
+by the disturbance set \(\mathcal W\) and by the closed-loop matrix \(A_K\), not by the particular
+nominal trajectory chosen online. Hence the error bounds can be computed offline.\\
+Furthermore, the dynamics $A+BK$ are stable, and the set $\mathcal W$ is bounded, so there is some set $\mathcal E$ that $e$ will stay inside for all time.\\
+We wish now to bound the maximum error, or to see how far the real trajector is from the nominal trajectory.
+
+\subsection{Uncertain state evolution of the error}
+
+We now study more carefully how the error evolves under the feedback law introduced above. The
+error dynamics are
+\[
+    e_{i+1}=A_K e_i+w_i,
+    \qquad
+    A_K:=A+BK,
+    \qquad
+    w_i\in\mathcal W.
+\]
+Assume first that the real and nominal trajectories coincide at the beginning of the prediction,
+so that
+\[
+    e_0=0.
+\]
+This is the situation that occurs, for instance, when the nominal prediction is initialized at the
+current measured state. The first prediction steps are then
+\[
+    e_1=w_0,
+\]
+\[
+    e_2=A_K e_1+w_1=A_Kw_0+w_1,
+\]
+and, by repeated substitution,
+\[
+    e_i
+    =
+    \sum_{j=0}^{i-1}A_K^j w_{i-1-j}.
+\]
+This formula shows explicitly how the disturbances accumulate through the stable dynamics
+\(A_K\). The error at time \(i\) is not produced only by the last disturbance \(w_{i-1}\), but by
+all previous disturbances, each propagated forward by the appropriate power of \(A_K\).\\
+Since each disturbance satisfies
+\[
+    w_i\in\mathcal W,
+\]
+we can ask the following set-valued question: where can the error be at prediction step \(i\)?
+The answer is the disturbance reachable set
+\[
+    \mathcal F_i
+    =
+    \mathcal W\oplus A_K\mathcal W\oplus\cdots\oplus A_K^{i-1}\mathcal W
+    =
+    \bigoplus_{j=0}^{i-1}A_K^j\mathcal W,
+    \qquad
+    \mathcal F_0:=\{0\}.
+\]
+Thus
+\[
+    e_i\in\mathcal F_i
+\]
+for every disturbance sequence \(w_0,\ldots,w_{i-1}\in\mathcal W\). The set \(\mathcal F_i\)
+therefore contains all possible errors at time \(i\), assuming the prediction starts from zero
+error.
+
+\begin{theorembox}[Disturbance reachable set]
+For the error dynamics
+\[
+    e_{i+1}=A_Ke_i+w_i,
+    \qquad w_i\in\mathcal W,
+\]
+with initial condition \(e_0=0\), the set of all possible errors at prediction step \(i\) is
+\[
+    \mathcal F_i
+    =
+    \bigoplus_{j=0}^{i-1}A_K^j\mathcal W,
+    \qquad
+    \mathcal F_0=\{0\}.
+\]
+\end{theorembox}
+
+The notation used above is the Minkowski sum:
+\[
+    \mathcal P\oplus\mathcal Q
+    :=
+    \{x+y\mid x\in\mathcal P,\ y\in\mathcal Q\}.
+\]
+Hence \(\mathcal F_i\) is obtained by adding all disturbance sets after propagation through the
+closed-loop matrix \(A_K\).
+
+\subsection{Minimum robust invariant set}
+
+As the prediction step \(i\) increases, the disturbance reachable set contains more and more
+terms:
+\[
+    \mathcal F_i
+    =
+    \mathcal W\oplus A_K\mathcal W\oplus\cdots\oplus A_K^{i-1}\mathcal W.
+\]
+If \(A_K\) is Schur stable and \(\mathcal W\) is bounded, these accumulated disturbance effects
+remain bounded. In the limit, one obtains
+\[
+    \mathcal F_\infty
+    =
+    \bigoplus_{j=0}^{\infty}A_K^j\mathcal W,
+    \qquad
+    \mathcal F_0:=\{0\}.
+\]
+This limiting set is the minimum robust positively invariant set associated with the error
+dynamics
+\[
+    e^+=A_Ke+w.
+\]
+It is ``minimum'' in the sense that it is the smallest set that necessarily contains all possible
+steady-state error values generated by the persistent disturbance.\\
+The invariance property can be seen directly from the definition. If
+\[
+    e\in\mathcal F_\infty,
+\]
+then, after one disturbed step,
+\[
+    e^+=A_Ke+w\in A_K\mathcal F_\infty\oplus\mathcal W.
+\]
+But
+\[
+\begin{aligned}
+    A_K\mathcal F_\infty\oplus\mathcal W
+    &=
+    A_K\left(
+    \mathcal W\oplus A_K\mathcal W\oplus A_K^2\mathcal W\oplus\cdots
+    \right)
+    \oplus\mathcal W                                      \\
+    &=
+    A_K\mathcal W\oplus A_K^2\mathcal W\oplus A_K^3\mathcal W\oplus\cdots
+    \oplus\mathcal W                                      \\
+    &=
+    \mathcal W\oplus A_K\mathcal W\oplus A_K^2\mathcal W\oplus\cdots       \\
+    &=
+    \mathcal F_\infty.
+\end{aligned}
+\]
+Therefore,
+\[
+    e\in\mathcal F_\infty
+    \quad\Longrightarrow\quad
+    A_Ke+w\in\mathcal F_\infty
+    \qquad
+    \forall w\in\mathcal W.
+\]
+
+\begin{theorembox}[Minimum robust positively invariant set]
+For the error dynamics
+\[
+    e^+=A_Ke+w,
+    \qquad w\in\mathcal W,
+\]
+with \(A_K\) Schur stable, the set
+\[
+    \mathcal F_\infty
+    =
+    \bigoplus_{j=0}^{\infty}A_K^j\mathcal W
+\]
+is the minimum robust positively invariant set generated by the disturbance.
+\end{theorembox}
+
+A conceptual algorithm for computing this set is obtained by accumulating the terms in the
+Minkowski sum:
+\[
+    \Omega_0\leftarrow\{0\},
+\]
+and then, for \(i=0,1,2,\ldots\),
+\[
+    \Omega_{i+1}\leftarrow \Omega_i\oplus A_K^i\mathcal W.
+\]
+If there exists a finite index \(n\) such that
+\[
+    \mathcal F_n=\mathcal F_{n+1},
+\]
+then no new error directions are generated by further disturbances and
+\[
+    \mathcal F_n=\mathcal F_\infty.
+\]
+In general, such a finite \(n\) does not always exist. In that case, a sufficiently large \(n\)
+gives an approximation, or one computes a robust invariant outer approximation that is slightly
+larger than \(\mathcal F_\infty\).
+
+\begin{theorembox}[Conceptual computation of \(\mathcal F_\infty\)]
+Initialize
+\[
+    \Omega_0\leftarrow\{0\}.
+\]
+For \(i=0,1,2,\ldots\), compute
+\[
+    \Omega_{i+1}\leftarrow \Omega_i\oplus A_K^i\mathcal W.
+\]
+If
+\[
+    \Omega_{i+1}=\Omega_i,
+\]
+then return
+\[
+    \mathcal F_\infty=\Omega_i.
+\]
+If finite termination does not occur, one uses a finite approximation or an invariant outer
+approximation.
+\end{theorembox}
+
+\subsection{Example: convergence to the minimum robust invariant set}
+
+The construction can be illustrated on the closed-loop disturbed system
+\[
+    x(k+1)
+    =
+    \left(
+    \begin{bmatrix}
+        1 & 1\\
+        0 & 1
+    \end{bmatrix}
+    +
+    \begin{bmatrix}
+        1\\
+        0.5
+    \end{bmatrix}
+    K
+    \right)x(k)
+    +
+    w(k),
+\]
+with disturbance set
+\[
+    \mathcal W
+    :=
+    \{w\mid |w_1|\leq 0.01,\ |w_2|\leq 0.1\}.
+\]
+Here \(K\) is chosen as the LQR controller for
+\[
+    Q=I,
+    \qquad
+    R=10.
+\]
+The sets
+\[
+    A_K^j\mathcal W
+\]
+are propagated disturbance sets. Their Minkowski sum grows toward the limiting set
+\[
+    \mathcal F_\infty.
+\]
+Once the error is inside this set, every subsequent disturbed evolution remains inside the same
+set. Therefore, the state trajectory of the error system stays in \(\mathcal F_\infty\) for all
+time.\\
+
+\begin{figure}[t]
+    \centering
+    % Replace the file name with the corresponding slide/image file.
+    \includegraphics[width=0.78\textwidth]{images/minimum_robust_invariant_set_example.png}
+    \caption{Example of the minimum robust invariant set for the disturbed closed-loop system
+    \(x(k+1)=A_Kx(k)+w(k)\). The left plot shows the sets \(A_K^j\mathcal W\) accumulating
+    toward \(\mathcal F_\infty\). The right plot shows that disturbed trajectories remain inside
+    the invariant set once the disturbance effects have accumulated.}
+    \label{fig:minimum_robust_invariant_set_example}
+\end{figure}
+
+This example emphasizes the role of the stabilizing feedback \(K\). The disturbance is persistent,
+so the error cannot be forced to zero. However, if \(A_K\) is stable, the effect of old
+disturbances decays, and the total error remains confined to a bounded robust invariant set.
+
+\subsection{From error bounds to robust MPC: two variants}
+
+The error dynamics
+\[
+    e_{i+1}=(A+BK)e_i+w_i=A_Ke_i+w_i,
+    \qquad
+    w_i\in\mathcal W,
+\]
+provide the basis for two robust MPC constructions. Both use the same feedback gain \(K\), and
+both plan a nominal trajectory. The difference is in how the error between the real and nominal
+states is bounded.\\
+
+The first possibility is to use the disturbance reachable sets
+\[
+    \mathcal F_i
+    =
+    \bigoplus_{j=0}^{i-1}A_K^j\mathcal W,
+    \qquad
+    e_0=0.
+\]
+In this case the error bound depends on the prediction step. At the beginning of the prediction
+the error is zero, while later along the horizon the set \(\mathcal F_i\) becomes larger as more
+disturbances may have accumulated. This leads to robust constraint-tightening MPC. The tube
+around the nominal trajectory is time-varying:
+\[
+    x_i\in z_i\oplus\mathcal F_i.
+\]
+
+The second possibility is to use a robust positively invariant set \(\mathcal E\), satisfying
+\[
+    e_i\in\mathcal E
+    \quad\Longrightarrow\quad
+    e_{i+1}\in\mathcal E
+    \qquad
+    \forall w_i\in\mathcal W.
+\]
+Then, for any initial error \(e_0\in\mathcal E\), one has
+\[
+    e_i\in\mathcal E
+    \qquad
+    \forall i\geq 0.
+\]
+This leads to tube MPC. Instead of a growing tube, one uses a constant tube cross-section:
+\[
+    x_i\in z_i\oplus\mathcal E.
+\]
+
+\begin{theorembox}[Two robust MPC variants from the error dynamics]
+The error dynamics can be used in two main ways:
+\[
+    e_i\in\mathcal F_i
+    =
+    \bigoplus_{j=0}^{i-1}A_K^j\mathcal W,
+    \qquad e_0=0,
+\]
+which leads to robust constraint-tightening MPC, or
+\[
+    e_i\in\mathcal E,
+    \qquad
+    \mathcal E \ \text{RPI for } e^+=A_Ke+w,
+\]
+which leads to tube MPC.
+\end{theorembox}
+
+\begin{figure}[t]
+    \centering
+    % Replace the file name with the corresponding slide/image file.
+    \includegraphics[width=0.86\textwidth]{images/error_bounds_two_variants.png}
+    \caption{From error bounds to robust MPC. On the left, disturbance reachable sets
+    \(\mathcal F_i\) give a time-varying tube and lead to robust constraint-tightening MPC.
+    On the right, a robust positively invariant set \(\mathcal E\) gives a constant tube and
+    leads to tube MPC.}
+    \label{fig:error_bounds_two_variants}
+\end{figure}
+
+The disturbance-reachable-set approach is naturally tied to predictions initialized with zero
+error. It can be less conservative near the beginning of the horizon, because
+\[
+    \mathcal F_0=\{0\}.
+\]
+The RPI-set approach is more uniform: it assumes that the initial error may already lie anywhere
+inside \(\mathcal E\), and then guarantees that it remains there forever. This is the viewpoint
+used in tube MPC.
+\section{Robust Constraint-Tightening MPC with Error Feedback}
+
+\subsection{Noisy trajectory around a nominal trajectory}
+
+We now use the error dynamics to obtain a less conservative version of constraint tightening
+than the open-loop method discussed before. The real and nominal trajectories are related by
+\[
+    x_i=z_i+e_i.
+\]
+If the prediction starts from
+\[
+    z_0=x(k),
+\]
+then
+\[
+    e_0=x(k)-z_0=0.
+\]
+Therefore, under the feedback law
+\[
+    u_i=v_i+K(x_i-z_i),
+\]
+the error satisfies
+\[
+    e_i\in\mathcal F_i.
+\]
+Consequently,
+\[
+    x_i\in z_i\oplus\mathcal F_i.
+\]
+The nominal state \(z_i\) is the center of a possible set of real states. The set
+\(\mathcal F_i\) describes the maximum possible deviation from this center at prediction step
+\(i\).
+
+\begin{figure}[t]
+    \centering
+    % Replace the file name with the corresponding slide/image file.
+    \includegraphics[width=0.55\textwidth]{images/noisy_trajectory_drs.png}
+    \caption{At prediction step \(i\), the real state satisfies
+    \(x_i\in z_i\oplus\mathcal F_i\). The nominal state \(z_i\) is the planned tube center, while
+    \(\mathcal F_i\) bounds the possible deviation caused by disturbances.}
+    \label{fig:noisy_trajectory_drs}
+\end{figure}
+
+\subsection{Tightened state and input constraints}
+
+The robust state constraint requires
+\[
+    x_i\in\mathcal X
+    \qquad
+    \forall w_0,\ldots,w_{i-1}\in\mathcal W.
+\]
+Since
+\[
+    x_i\in z_i\oplus\mathcal F_i,
+\]
+this is guaranteed if and only if
+\[
+    z_i\oplus\mathcal F_i\subseteq\mathcal X.
+\]
+By the definition of the Pontryagin difference, this is equivalent to
+\[
+    z_i\in\mathcal X\ominus\mathcal F_i.
+\]
+Thus, instead of imposing the original state constraint on the nominal trajectory, we impose the
+tightened constraint
+\[
+    z_i\in\mathcal X\ominus\mathcal F_i.
+\]
+The same reasoning applies to the input. Since
+\[
+    u_i=v_i+Ke_i
+\]
+and \(e_i\in\mathcal F_i\), the set of possible inputs at time \(i\) is
+\[
+    u_i\in v_i\oplus K\mathcal F_i.
+\]
+Robust satisfaction of the input constraint is therefore guaranteed by
+\[
+    v_i\oplus K\mathcal F_i\subseteq\mathcal U,
+\]
+or equivalently
+\[
+    v_i\in\mathcal U\ominus K\mathcal F_i.
+\]
+
+\begin{theorembox}[Constraint tightening with disturbance reachable sets]
+If
+\[
+    e_i\in\mathcal F_i,
+\]
+then robust satisfaction of the original constraints
+\[
+    x_i\in\mathcal X,\qquad u_i\in\mathcal U
+\]
+is guaranteed by imposing the nominal constraints
+\[
+    z_i\in\mathcal X\ominus\mathcal F_i,
+    \qquad
+    v_i\in\mathcal U\ominus K\mathcal F_i.
+\]
+\end{theorembox}
+
+The sets \(\mathcal F_i\) depend only on \(A_K\) and \(\mathcal W\). Hence the tightened sets
+\[
+    \mathcal X\ominus\mathcal F_i,
+    \qquad
+    \mathcal U\ominus K\mathcal F_i
+\]
+can be computed offline.
+
+\subsection{Robust constraint-tightening MPC problem}
+
+We now combine the nominal system dynamics with the disturbance reachable sets derived above.
+The idea is to optimize a nominal trajectory
+\[
+    z_0,z_1,\ldots,z_N
+\]
+and a nominal input sequence
+\[
+    v_0,v_1,\ldots,v_{N-1},
+\]
+while tightening the state and input constraints so that the real disturbed trajectory remains
+feasible for all admissible disturbances.\\
+
+Recall that the error dynamics are governed by
+\[
+    e_{i+1}=A_Ke_i+w_i,
+    \qquad
+    A_K:=A+BK,
+\]
+and that, when the prediction starts from zero error, the error at step \(i\) belongs to the
+disturbance reachable set
+\[
+    \mathcal F_i
+    :=
+    \mathcal W\oplus A_K\mathcal W\oplus\cdots\oplus A_K^{i-1}\mathcal W
+    =
+    \bigoplus_{j=0}^{i-1}A_K^j\mathcal W,
+    \qquad
+    \mathcal F_0:=\{0\}.
+\]
+Therefore, if the nominal state is \(z_i\), then the real state can lie anywhere in
+\[
+    z_i\oplus \mathcal F_i.
+\]
+Likewise, since the control law is
+\[
+    u_i=v_i+K(x_i-z_i),
+\]
+the real input lies in
+\[
+    v_i\oplus K\mathcal F_i.
+\]
+Robust satisfaction of the original constraints is then enforced by requiring
+\[
+    z_i\in \mathcal X\ominus \mathcal F_i,
+    \qquad
+    v_i\in \mathcal U\ominus K\mathcal F_i.
+\]
+
+At time \(k\), robust constraint-tightening MPC solves the nominal optimization problem
+\[
+\begin{aligned}
+    \min_{Z,V}\quad
+    &
+    \sum_{i=0}^{N-1}\ell(z_i,v_i)+\ell_f(z_N)
+    \\
+    \text{subj. to}\quad
+    &
+    z_{i+1}=Az_i+Bv_i,
+    \qquad i=0,\ldots,N-1,
+    \\
+    &
+    z_i\in\mathcal X\ominus \mathcal F_i,
+    \qquad i=0,\ldots,N-1,
+    \\
+    &
+    v_i\in\mathcal U\ominus K\mathcal F_i,
+    \qquad i=0,\ldots,N-1,
+    \\
+    &
+    z_N\in\mathcal X_f^{\mathrm{ct}}\ominus \mathcal F_N,
+    \\
+    &
+    z_0=x(k).
+\end{aligned}
+\]
+
+\begin{theorembox}[Robust constraint-tightening MPC problem]
+The robust constraint-tightening MPC problem optimizes the nominal dynamics
+\[
+    z_{i+1}=Az_i+Bv_i
+\]
+subject to the tightened constraints
+\[
+    z_i\in\mathcal X\ominus \mathcal F_i,
+    \qquad
+    v_i\in\mathcal U\ominus K\mathcal F_i,
+\]
+and the tightened terminal constraint
+\[
+    z_N\in\mathcal X_f^{\mathrm{ct}}\ominus \mathcal F_N.
+\]
+Here
+\[
+    \mathcal F_i=\bigoplus_{j=0}^{i-1}A_K^j\mathcal W,
+    \qquad \mathcal F_0=\{0\},
+\]
+and the prediction is initialized with
+\[
+    z_0=x(k).
+\]
+\end{theorembox}
+
+The initialization
+\[
+    z_0=x(k)
+\]
+is important. It implies that the initial error is zero, and therefore the first applied input is
+simply
+\[
+    u(k)=v_0^\star+K\bigl(x(k)-z_0^\star\bigr)=v_0^\star.
+\]
+Thus the feedback term does not affect the first move, but it is essential in the prediction of the
+future error bounds through the sets \(\mathcal F_i\). The terminal set
+\(\mathcal X_f^{\mathrm{ct}}\) is chosen so as to be robustly invariant under the terminal
+controller.
+
+\subsection{Properties of robust constraint-tightening MPC}
+
+The main property of this formulation is recursive feasibility. Intuitively, if the optimization
+problem is feasible at the current state, then after one disturbed step it remains feasible at the
+next state as well. This is the robust counterpart of the standard feasibility result in nominal
+MPC.\\
+
+To guarantee this property, the terminal ingredients \((\ell_f,\mathcal X_f^{\mathrm{ct}})\) must
+be chosen so that the terminal set is compatible with the terminal controller. More precisely,
+we assume
+\[
+    \mathcal X_f^{\mathrm{ct}}\subseteq \mathcal X,
+\]
+and that for every
+\[
+    z\in\mathcal X_f^{\mathrm{ct}},
+\]
+the corresponding terminal input satisfies
+\[
+    Kz\in\mathcal U,
+\]
+while the terminal set is robust positively invariant under the disturbed closed-loop dynamics,
+that is,
+\[
+    (A+BK)z+w\in\mathcal X_f^{\mathrm{ct}}
+    \qquad
+    \forall w\in\mathcal W.
+\]
+
+\begin{theorembox}[Robust invariance of the terminal set]
+Suppose the terminal ingredients \((\ell_f,\mathcal X_f^{\mathrm{ct}})\) are designed such that
+\[
+    \mathcal X_f^{\mathrm{ct}}\subseteq \mathcal X,
+\]
+and for all \(z\in\mathcal X_f^{\mathrm{ct}}\),
+\[
+    Kz\in\mathcal U,
+\]
+\[
+    (A+BK)z+w\in\mathcal X_f^{\mathrm{ct}}
+    \qquad
+    \forall w\in\mathcal W.
+\]
+Then \(\mathcal X_f^{\mathrm{ct}}\) is a robust positively invariant terminal set for the
+terminal controller.
+\end{theorembox}
+
+Let \(\mathcal X_N\) denote the feasible set of the robust constraint-tightening MPC problem,
+and let \(V^\star(x(k))\) denote the corresponding optimizer for the state \(x(k)\in\mathcal X_N\).
+Then, after applying the first optimal nominal input \(v_0^\star(x(k))\), the next real state is
+\[
+    x(k+1)=Ax(k)+Bv_0^\star(x(k))+w(k).
+\]
+Since the optimization problem was formulated so that the predicted tube is feasible for every
+possible disturbance realization, it is in particular feasible for the disturbance that is actually
+observed. Hence
+\[
+    x(k+1)\in\mathcal X_N
+    \qquad
+    \forall w(k)\in\mathcal W.
+\]
+
+\begin{theorembox}[Recursive feasibility]
+Let \(\mathcal X_N\) be the feasible set of the robust constraint-tightening MPC problem.
+Under the robust terminal invariance assumptions above, if
+\[
+    x(k)\in\mathcal X_N,
+\]
+then
+\[
+    x(k+1)=Ax(k)+Bv_0^\star(x(k))+w(k)\in\mathcal X_N
+    \qquad
+    \forall w(k)\in\mathcal W.
+\]
+Therefore the robust constraint-tightening MPC problem is recursively feasible.
+\end{theorembox}
+
+This result is the essential robustness guarantee of the scheme. It says that once the problem is
+feasible, feasibility is preserved for all future times despite the disturbance. Stability analysis,
+however, requires a more refined notion, typically input-to-state stability, and goes beyond the
+basic recursive-feasibility argument.
+
+\subsection{Intuition}
+
+The geometric interpretation of the method is very useful. Around each nominal prediction
+\(z_i\), one considers the disturbance reachable set \(\mathcal F_i\). Hence the real state at step
+\(i\) may lie anywhere in the set
+\[
+    z_i\oplus \mathcal F_i.
+\]
+If this whole set remains inside the state constraints, then the real state is guaranteed to satisfy
+the original constraints for every admissible disturbance realization.
+
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.4\textwidth]{images/constraint_tightening_intuition_1.png}
+    \caption{Intuition behind robust constraint-tightening MPC. Around each nominal state
+    \(z_i\), the disturbance reachable set \(\mathcal F_i\) describes the possible location of the
+    real state \(x_i\). The nominal trajectory must therefore remain sufficiently far from the
+    boundary of the constraint set.}
+    \label{fig:constraint_tightening_intuition_1}
+\end{figure}
+
+After one control step, the actual disturbed state is not exactly at the nominal successor
+\(z_1^\star\), but rather at
+\[
+    x^+=z_1^\star+w,
+\]
+or, more generally, inside the corresponding disturbed tube. The candidate nominal trajectory at
+the next time step is then obtained by shifting the previous optimal trajectory forward and
+accounting for the effect of the disturbance. The key geometric fact is that the disturbance
+reachable set around this shifted candidate remains contained in the previously feasible tube.
+
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.4\textwidth]{images/constraint_tightening_intuition_2.png}
+    \caption{After the first disturbance is realized, the next nominal candidate is perturbed with
+    respect to the previous optimal nominal trajectory. The new disturbance reachable tube is
+    contained in the previously feasible one, which is the key idea behind recursive feasibility.}
+    \label{fig:constraint_tightening_intuition_2}
+\end{figure}
+
+This picture explains why the formulation is less conservative than purely open-loop robust MPC.
+The future tube is not built only from the open-loop system matrix \(A\), but from the stabilized
+error dynamics
+\[
+    e_{i+1}=A_Ke_i+w_i,
+\]
+so the feedback correction \(K\) already enters the prediction through the sets \(\mathcal F_i\).
+
+\subsection{Proof sketch}
+
+We now sketch the recursive-feasibility argument more explicitly. Let
+\[
+    \{z_0^\star,\ldots,z_N^\star\},
+    \qquad
+    \{v_0^\star,\ldots,v_{N-1}^\star\}
+\]
+be the optimal nominal state and input sequences at time \(k\). Because the problem is
+initialized with
+\[
+    z_0^\star=x(k),
+\]
+the first applied control is
+\[
+    u(k)=v_0^\star.
+\]
+After the disturbance \(w(k)\) is realized, the next state is
+\[
+    x^+=x(k+1)=z_1^\star+w(k).
+\]
+
+To prove recursive feasibility, we construct a candidate solution for the optimization problem at
+time \(k+1\). As in the slides, this candidate is based on the error feedback and on the terminal
+controller:
+\[
+    v_i=v_{i+1}^\star+K(z_i-z_{i+1}^\star),
+    \qquad i=0,\ldots,N-1,
+\]
+with
+\[
+    v_N^\star=Kz_N^\star,
+    \qquad
+    z_{N+1}^\star=A_K z_N^\star.
+\]
+Recursive application yields the candidate state and input sequences
+\[
+    z_i=z_{i+1}^\star+A_K^i w(k),
+    \qquad i=0,\ldots,N,
+\]
+and
+\[
+    v_i=v_{i+1}^\star+KA_K^i w(k),
+    \qquad i=0,\ldots,N-1.
+\]
+One verifies by induction that the candidate satisfies the nominal dynamics. Indeed,
+\[
+\begin{aligned}
+    z_{i+1}
+    &=Az_i+Bv_i \\
+    &=A\bigl(z_{i+1}^\star+A_K^i w(k)\bigr)
+      +B\Bigl(v_{i+1}^\star+K\bigl(z_i-z_{i+1}^\star\bigr)\Bigr) \\
+    &=z_{i+2}^\star+A_K^{i+1}w(k).
+\end{aligned}
+\]
+This matches exactly the recursive construction above.
+
+The next step is the nested-tube argument. For each prediction step,
+\[
+\begin{aligned}
+    z_i\oplus \mathcal F_i
+    &=
+    z_{i+1}^\star+A_K^i w(k)\oplus \mathcal F_i \\
+    &\subseteq
+    z_{i+1}^\star\oplus A_K^i\mathcal W\oplus \mathcal F_i \\
+    &=
+    z_{i+1}^\star\oplus \mathcal F_{i+1}.
+\end{aligned}
+\]
+Hence the candidate prediction tube at time \(k+1\) is contained in the previously feasible tube
+at time \(k\). This proves that all tightened state constraints remain satisfied. The input
+constraints are shown in exactly the same way.
+
+At the terminal step, one obtains
+\[
+\begin{aligned}
+    z_N\oplus \mathcal F_N
+    &\subseteq
+    z_{N+1}^\star\oplus \mathcal F_{N+1} \\
+    &=
+    A_K\bigl(z_N^\star\oplus \mathcal F_N\bigr)\oplus \mathcal W \\
+    &\subseteq
+    A_K\mathcal X_f^{\mathrm{ct}}\oplus \mathcal W \\
+    &\subseteq
+    \mathcal X_f^{\mathrm{ct}},
+\end{aligned}
+\]
+where the last inclusion follows from robust positive invariance of the terminal set. Therefore
+the terminal constraint is also satisfied. This completes the proof sketch: the shifted candidate is
+feasible, and so the optimization problem remains feasible at the next step.
+
+\begin{theorembox}[Idea of the proof]
+The recursive-feasibility proof is based on three ingredients:
+the shifted nominal candidate, the containment
+\[
+    z_i\oplus\mathcal F_i\subseteq z_{i+1}^\star\oplus\mathcal F_{i+1},
+\]
+and robust invariance of the terminal set. Together, these show that the candidate built at time
+\(k+1\) satisfies all tightened constraints.
+\end{theorembox}
+\section{Robust Tube MPC}
+
+\subsection{Idea and construction}
+
+\subsubsection{Tube MPC: the idea}
+
+The robust constraint-tightening MPC formulation used disturbance reachable sets
+\(\mathcal F_i\), which depend on the prediction step. Tube MPC takes a slightly different
+viewpoint. Instead of using a different error set at every step, it bounds the error by a single
+robust positively invariant set \(\mathcal E\).\\
+
+The nominal system is still planned without disturbances:
+\[
+    z(k+1)=Az(k)+Bv(k).
+\]
+The real system is affected by the disturbance:
+\[
+    x(k+1)=Ax(k)+Bu(k)+w(k),
+    \qquad w(k)\in\mathcal W.
+\]
+The controller is assumed to have the form
+\[
+    u_i=v_i+K(x_i-z_i),
+\]
+where \(K\) is a fixed stabilizing feedback gain. The nominal input \(v_i\) steers the nominal
+trajectory, while the feedback term \(K(x_i-z_i)\) keeps the real trajectory close to the nominal
+one.\\
+The error
+\[
+    e_i=x_i-z_i
+\]
+then satisfies
+\[
+    e_{i+1}=A_Ke_i+w_i,
+    \qquad
+    A_K:=A+BK.
+\]
+If \(\mathcal E\) is a robust positively invariant set for this error dynamics, then
+\[
+    e_i\in\mathcal E
+    \quad\Longrightarrow\quad
+    e_{i+1}\in\mathcal E
+    \qquad
+    \forall w_i\in\mathcal W.
+\]
+Therefore, once the error lies in \(\mathcal E\), it remains in \(\mathcal E\) for all future times.
+As a consequence, the real state remains inside the tube
+\[
+    x_i\in z_i\oplus\mathcal E.
+\]
+
+\begin{figure}[t]
+    \centering
+
+    \begin{subfigure}[t]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/tube_mpc_idea_nominal.png}
+        \caption{Nominal trajectory with tube cross-sections.The real trajectory stays close to the nominal one.}
+        \label{fig:tube_mpc_idea_nominal}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/tube_mpc_idea_constraints.png}
+        \caption{The whole tube must satisfy the state constraints.}
+        \label{fig:tube_mpc_idea_constraints}
+    \end{subfigure}
+
+    \caption{Tube MPC idea. The optimizer plans a nominal trajectory \(z_i\), while the feedback
+    law \(u_i=v_i+K(x_i-z_i)\) keeps the real state \(x_i\) inside the tube
+    \(z_i\oplus\mathcal E\). The tube must remain inside the admissible state constraint set.}
+    \label{fig:tube_mpc_idea_three_steps}
+\end{figure}
+
+In this sense, tube MPC ignores the noise when planning the nominal trajectory, but accounts for
+the noise by surrounding the nominal trajectory with an invariant tube. Ideally, one chooses
+\[
+    \mathcal E=\mathcal F_\infty
+    =
+    \bigoplus_{j=0}^{\infty}A_K^j\mathcal W,
+\]
+namely the minimal robust positively invariant set of the error dynamics. In practice,
+\(\mathcal F_\infty\) may be difficult to compute exactly, and one often uses a robust invariant
+outer approximation.
+
+\begin{theorembox}[Tube MPC idea]
+Tube MPC plans a nominal trajectory \(z_i\) for the disturbance-free system and applies the
+feedback law
+\[
+    u_i=v_i+K(x_i-z_i).
+\]
+If the error set \(\mathcal E\) is robust positively invariant for
+\[
+    e^+=A_Ke+w,
+\]
+then
+\[
+    x_i\in z_i\oplus\mathcal E
+\]
+for all admissible disturbance realizations.
+\end{theorembox}
+
+\subsubsection{What must be designed}
+
+The construction of tube MPC consists of two parts. First, one must build the tube and the
+corresponding tightened nominal constraints. Second, one must prove that the resulting
+closed-loop controller has the desired robust properties.\\
+
+The design therefore requires the following ingredients. One must compute a set
+\(\mathcal E\) such that the error remains inside it. Then one must modify the constraints on the
+nominal trajectory \(z_i\) so that the entire tube \(z_i\oplus\mathcal E\) remains feasible.
+Finally, one must formulate the resulting problem as a tractable optimization problem.\\
+
+After the formulation is defined, two properties have to be established. The first is robust
+constraint satisfaction: for all admissible disturbances, the real state and input must satisfy
+\[
+    x_i\in\mathcal X,
+    \qquad
+    u_i\in\mathcal U.
+\]
+The second is robust stability: because the disturbance is persistent, the state cannot generally
+converge exactly to the origin, but it should converge to the invariant tube around the origin.
+
+\begin{theorembox}[Tube MPC design tasks]
+To make tube MPC work, one needs to:
+\[
+    \text{compute } \mathcal E,
+    \qquad
+    \text{tighten the nominal constraints},
+    \qquad
+    \text{formulate the nominal MPC problem}.
+\]
+Then one proves robust constraint satisfaction and robust stability of the closed-loop system.
+\end{theorembox}
+
+\subsubsection{Recall: robust invariant set}
+
+Before using the set \(\mathcal E\), it is useful to recall the notion of robust positive
+invariance. Consider an autonomous disturbed system
+\[
+    x(k+1)=g(x(k),w(k)),
+    \qquad
+    w(k)\in\mathcal W,
+\]
+or a closed-loop disturbed system
+\[
+    x(k+1)=g(x(k),\kappa(x(k)),w(k)),
+\]
+where the feedback law \(\kappa\) is fixed. A set \(\mathcal O_{\mathcal W}\) is robust positively
+invariant if, whenever the current state belongs to the set, the next state belongs to the same
+set for every admissible disturbance.
+
+\begin{theorembox}[Robust positive invariant set]
+A set \(\mathcal O_{\mathcal W}\) is a robust positive invariant set for
+\[
+    x(k+1)=g(x(k),w(k)),
+    \qquad
+    w(k)\in\mathcal W,
+\]
+if
+\[
+    x\in\mathcal O_{\mathcal W}
+    \quad\Longrightarrow\quad
+    g(x,w)\in\mathcal O_{\mathcal W}
+    \qquad
+    \forall w\in\mathcal W.
+\]
+\end{theorembox}
+
+There is an important difference between the invariant sets used previously as terminal sets and
+the invariant set used here. Previously, one was often interested in a large robust invariant set,
+because the goal was to maximize the terminal region in which a local controller can keep the
+state feasible. In tube MPC, instead, one wants a small robust invariant set for the error
+dynamics, because \(\mathcal E\) measures the size of the tube. A smaller \(\mathcal E\) means
+less constraint tightening and therefore a larger feasible region for the nominal MPC problem.
+
+\subsubsection{Noisy system trajectory: constant tube}
+
+Given a nominal trajectory \(z_i\), the real trajectory can be written as
+\[
+    x_i=z_i+e_i.
+\]
+The exact error \(e_i\) is not known in advance, because it depends on the disturbance
+sequence. However, if the error set \(\mathcal E\) is robust positively invariant and
+\(e_0\in\mathcal E\), then
+\[
+    e_i\in\mathcal E
+    \qquad
+    \forall i\geq 0.
+\]
+Therefore the real state satisfies
+\[
+    x_i\in z_i\oplus\mathcal E
+    =
+    \{z_i+e\mid e\in\mathcal E\}.
+\]
+This is why the construction is called tube MPC: the nominal trajectory is surrounded by a
+constant tube with cross-section \(\mathcal E\).
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.68\textwidth]{images/noisy_system_trajectory_constant_tube.png}
+    \caption{Noisy system trajectory with a constant tube. Given a nominal trajectory \(z_i\),
+    the real state can be anywhere in \(z_i\oplus\mathcal E\). The set \(\mathcal E\) bounds the
+    error between the real and nominal trajectories at all prediction steps.}
+    \label{fig:noisy_system_trajectory_constant_tube}
+\end{figure}
+
+\subsubsection{Constraint tightening}
+
+The goal is to guarantee
+\[
+    x_i\in\mathcal X,
+    \qquad
+    u_i\in\mathcal U,
+\]
+for all disturbance sequences
+\[
+    \{w_0,\ldots,w_{i-1}\}\in\mathcal W^i.
+\]
+Tube MPC achieves this while optimizing only the nominal dynamics
+\[
+    z(k+1)=Az(k)+Bv(k).
+\]
+The noisy system
+\[
+    x(k+1)=Ax(k)+Bu(k)+w(k)
+\]
+is kept feasible by tightening the constraints imposed on \(z_i\) and \(v_i\).\\
+
+For the state constraint, since
+\[
+    x_i\in z_i\oplus\mathcal E,
+\]
+we need
+\[
+    z_i\oplus\mathcal E\subseteq\mathcal X.
+\]
+By definition of the Pontryagin difference, this is equivalent to
+\[
+    z_i\in\mathcal X\ominus\mathcal E.
+\]
+Thus the nominal state must satisfy the tightened state constraint
+\[
+    z_i\in\mathcal X\ominus\mathcal E.
+\]
+The same argument applies to the input. Since
+\[
+    u_i=v_i+K(x_i-z_i)=v_i+Ke_i
+\]
+and
+\[
+    e_i\in\mathcal E,
+\]
+the possible inputs satisfy
+\[
+    u_i\in v_i\oplus K\mathcal E.
+\]
+Therefore robust satisfaction of \(u_i\in\mathcal U\) is equivalent to
+\[
+    v_i\oplus K\mathcal E\subseteq\mathcal U,
+\]
+or
+\[
+    v_i\in\mathcal U\ominus K\mathcal E.
+\]
+
+\begin{theorembox}[Constraint tightening for tube MPC]
+The necessary and sufficient tightening conditions are
+\[
+    z_i\oplus\mathcal E\subseteq\mathcal X
+    \quad\Longleftrightarrow\quad
+    z_i\in\mathcal X\ominus\mathcal E,
+\]
+and
+\[
+    v_i\oplus K\mathcal E\subseteq\mathcal U
+    \quad\Longleftrightarrow\quad
+    v_i\in\mathcal U\ominus K\mathcal E.
+\]
+Since \(\mathcal E\) is computed offline, the tightened constraints
+\[
+    \mathcal X\ominus\mathcal E,
+    \qquad
+    \mathcal U\ominus K\mathcal E
+\]
+can also be computed offline.
+\end{theorembox}
+
+\subsection{Tube MPC formulation and assumptions}
+
+\subsubsection{Optimization problem}
+
+We can now formulate the tube MPC optimization problem. The decision variables are the nominal
+state sequence
+\[
+    Z=\{z_0,\ldots,z_N\}
+\]
+and the nominal input sequence
+\[
+    V=\{v_0,\ldots,v_{N-1}\}.
+\]
+For a measured state \(x_0\), the feasible set is defined as
+\[
+\begin{aligned}
+    \mathcal Z(x_0)
+    :=
+    \Bigl\{(Z,V)\ \Big|\ 
+    &
+    z_{i+1}=Az_i+Bv_i,
+    \qquad i=0,\ldots,N-1,
+    \\
+    &
+    z_i\in\mathcal X\ominus\mathcal E,
+    \qquad i=0,\ldots,N-1,
+    \\
+    &
+    v_i\in\mathcal U\ominus K\mathcal E,
+    \qquad i=0,\ldots,N-1,
+    \\
+    &
+    z_N\in\mathcal X_f,
+    \\
+    &
+    x_0\in z_0\oplus\mathcal E
+    \Bigr\}.
+\end{aligned}
+\]
+The cost function is evaluated on the nominal tube centers:
+\[
+    J(Z,V)
+    :=
+    \sum_{i=0}^{N-1}\ell(z_i,v_i)+\ell_f(z_N).
+\]
+The optimization problem is
+\[
+    (V^\star(x_0),Z^\star(x_0))
+    =
+    \argmin_{V,Z}
+    \{J(Z,V)\mid (Z,V)\in\mathcal Z(x_0)\}.
+\]
+The applied control law is
+\[
+    \mu_{\mathrm{tube}}(x)
+    :=
+    K\bigl(x-z_0^\star(x)\bigr)+v_0^\star(x).
+\]
+
+\begin{theorembox}[Tube MPC problem]
+Tube MPC solves
+\[
+    (V^\star(x_0),Z^\star(x_0))
+    =
+    \argmin_{V,Z}
+    \left\{
+    \sum_{i=0}^{N-1}\ell(z_i,v_i)+\ell_f(z_N)
+    \ \middle|\ 
+    (Z,V)\in\mathcal Z(x_0)
+    \right\},
+\]
+where \(\mathcal Z(x_0)\) is defined by the nominal dynamics, the tightened constraints
+\[
+    z_i\in\mathcal X\ominus\mathcal E,
+    \qquad
+    v_i\in\mathcal U\ominus K\mathcal E,
+\]
+the terminal condition \(z_N\in\mathcal X_f\), and the tube-inclusion condition
+\[
+    x_0\in z_0\oplus\mathcal E.
+\]
+The implemented input is
+\[
+    u=\mu_{\mathrm{tube}}(x)
+    =
+    K(x-z_0^\star(x))+v_0^\star(x).
+\]
+\end{theorembox}
+
+This formulation differs from robust constraint-tightening MPC in an important way. The first
+tube center \(z_0\) is an optimization variable; it is not forced to be equal to the measured state.
+The only requirement is that the measured state lies inside the first tube:
+\[
+    x_0\in z_0\oplus\mathcal E.
+\]
+The cost is with respect to the nominal tube centers, while robustness is enforced through the
+tightened constraints and the invariant error tube.
+
+\subsubsection{Terminal assumptions}
+
+The assumptions needed for tube MPC are essentially the nominal MPC assumptions applied to
+the tightened nominal system. First, the stage cost is positive definite: it is strictly positive
+away from the origin and equal to zero at the origin.\\
+
+Second, the terminal set \(\mathcal X_f\) is invariant for the nominal system under a local
+terminal controller
+\[
+    \kappa_f(z).
+\]
+That is,
+\[
+    Az+B\kappa_f(z)\in\mathcal X_f
+    \qquad
+    \forall z\in\mathcal X_f.
+\]
+Moreover, the terminal set and terminal controller must satisfy the tightened constraints:
+\[
+    \mathcal X_f\subseteq\mathcal X\ominus\mathcal E,
+\]
+\[
+    \kappa_f(z)\in\mathcal U\ominus K\mathcal E
+    \qquad
+    \forall z\in\mathcal X_f.
+\]
+Third, the terminal cost is a continuous Lyapunov function in the terminal set:
+\[
+    \ell_f(Az+B\kappa_f(z))-\ell_f(z)
+    \leq
+    -\ell(z,\kappa_f(z)),
+    \qquad
+    \forall z\in\mathcal X_f.
+\]
+
+\begin{theorembox}[Tube MPC assumptions]
+Tube MPC assumes:
+\[
+    \ell(z,v)>0
+    \quad \text{for } (z,v)\neq(0,0),
+\]
+\[
+    Az+B\kappa_f(z)\in\mathcal X_f
+    \qquad
+    \forall z\in\mathcal X_f,
+\]
+\[
+    \mathcal X_f\subseteq\mathcal X\ominus\mathcal E,
+    \qquad
+    \kappa_f(z)\in\mathcal U\ominus K\mathcal E
+    \qquad
+    \forall z\in\mathcal X_f,
+\]
+and
+\[
+    \ell_f(Az+B\kappa_f(z))-\ell_f(z)
+    \leq
+    -\ell(z,\kappa_f(z))
+    \qquad
+    \forall z\in\mathcal X_f.
+\]
+\end{theorembox}
+
+\subsection{Robust invariance and stability}
+
+\subsubsection{Robust invariance}
+
+We now prove the first main property: robust invariance of the feasible set. Define
+\[
+    \mathcal Z
+    :=
+    \{x\mid \mathcal Z(x)\neq\emptyset\}.
+\]
+This is the set of all states for which the tube MPC problem is feasible.
+
+\begin{theorembox}[Robust invariance of tube MPC]
+The set
+\[
+    \mathcal Z=\{x\mid \mathcal Z(x)\neq\emptyset\}
+\]
+is a robust positively invariant set for the closed-loop system
+\[
+    x(k+1)=Ax(k)+B\mu_{\mathrm{tube}}(x(k))+w(k),
+    \qquad
+    w(k)\in\mathcal W,
+\]
+subject to the constraints
+\[
+    x(k)\in\mathcal X,
+    \qquad
+    u(k)\in\mathcal U.
+\]
+\end{theorembox}
+
+Let
+\[
+    \bigl(\{v_0^\star,\ldots,v_{N-1}^\star\},
+    \{z_0^\star,\ldots,z_N^\star\}\bigr)
+\]
+be the optimal solution for \(x(k)\). The applied input is
+\[
+    \mu_{\mathrm{tube}}(x(k))
+    =
+    K(x(k)-z_0^\star)+v_0^\star.
+\]
+The next state is therefore
+\[
+\begin{aligned}
+    x(k+1)
+    &=
+    Ax(k)+BK(x(k)-z_0^\star)+Bv_0^\star+w(k)       \\
+    &=
+    Az_0^\star+Bv_0^\star
+    +
+    A_K(x(k)-z_0^\star)+w(k)                       \\
+    &=
+    z_1^\star+A_Ke_0+w(k),
+\end{aligned}
+\]
+where
+\[
+    e_0=x(k)-z_0^\star.
+\]
+Because the initial tube constraint gives
+\[
+    x(k)\in z_0^\star\oplus\mathcal E,
+\]
+we have
+\[
+    e_0\in\mathcal E.
+\]
+Since \(\mathcal E\) is robust positively invariant,
+\[
+    A_Ke_0+w(k)\in\mathcal E.
+\]
+Hence
+\[
+    x(k+1)\in z_1^\star\oplus\mathcal E.
+\]
+This means that \(z_1^\star\) is a valid first tube center for the next measured state.\\
+
+As in nominal MPC, we can therefore construct a feasible candidate for the next optimization
+problem by shifting the previous nominal sequence and appending the terminal controller:
+\[
+    \{v_1^\star,\ldots,v_{N-1}^\star,\kappa_f(z_N^\star)\},
+\]
+\[
+    \{z_1^\star,\ldots,z_N^\star,Az_N^\star+B\kappa_f(z_N^\star)\}.
+\]
+The shifted sequence satisfies the nominal dynamics. The tightened state and input constraints
+remain satisfied because they were already satisfied by the previous optimal solution, and the
+terminal assumptions ensure that the appended terminal point and terminal input are feasible.
+Therefore the tube MPC problem is feasible for every possible value of \(x(k+1)\) generated by
+an admissible disturbance.
+
+\subsubsection{Robust stability}
+
+The second main property is robust stability. Since the disturbance is persistent, the real state
+does not generally converge to the origin. Instead, tube MPC guarantees convergence to the
+invariant error set \(\mathcal E\).
+
+\begin{theorembox}[Robust stability of tube MPC]
+For the closed-loop system
+\[
+    x(k+1)=Ax(k)+B\mu_{\mathrm{tube}}(x(k))+w(k),
+    \qquad
+    w(k)\in\mathcal W,
+\]
+the state \(x(k)\) converges in the limit to the set \(\mathcal E\):
+\[
+    \lim_{k\to\infty}\operatorname{dist}(x(k),\mathcal E)=0.
+\]
+\end{theorembox}
+
+The proof follows the standard MPC Lyapunov argument, but applied to the nominal tube centers.
+Let
+\[
+    J^\star(x(k))
+    =
+    \sum_{i=0}^{N-1}\ell(z_i^\star,v_i^\star)+\ell_f(z_N^\star)
+\]
+be the optimal value at time \(k\). Using the shifted feasible candidate at time \(k+1\), we get
+\[
+\begin{aligned}
+    J^\star(x(k+1))
+    &\leq
+    \sum_{i=1}^{N-1}\ell(z_i^\star,v_i^\star)
+    +
+    \ell(z_N^\star,\kappa_f(z_N^\star))
+    +
+    \ell_f(z_{N+1})
+    \\
+    &=
+    J^\star(x(k))
+    -
+    \ell(z_0^\star,v_0^\star)
+    -
+    \ell_f(z_N^\star)
+    +
+    \ell_f(z_{N+1})
+    +
+    \ell(z_N^\star,\kappa_f(z_N^\star)).
+\end{aligned}
+\]
+By the terminal Lyapunov condition,
+\[
+    \ell_f(z_{N+1})-\ell_f(z_N^\star)
+    \leq
+    -\ell(z_N^\star,\kappa_f(z_N^\star)).
+\]
+Therefore,
+\[
+    J^\star(x(k+1))
+    \leq
+    J^\star(x(k))
+    -
+    \ell(z_0^\star,v_0^\star).
+\]
+The optimal value decreases by at least the first nominal stage cost. Since the stage cost is
+positive definite, this implies
+\[
+    \lim_{k\to\infty} z_0^\star(x(k))=0.
+\]
+The real state, however, satisfies
+\[
+    x(k)\in z_0^\star(x(k))\oplus\mathcal E.
+\]
+Thus, as the tube center converges to the origin, the real state converges to the tube cross-section
+centered at the origin:
+\[
+    \lim_{k\to\infty}\operatorname{dist}(x(k),\mathcal E)=0.
+\]
+This is the correct robust stability statement in the presence of persistent disturbances.
+
+\subsection{Implementation and example}
+
+\subsubsection{Offline and online implementation}
+
+The final tube MPC algorithm can be separated into an offline design phase and an online
+implementation phase. Offline, one first chooses a stabilizing feedback gain \(K\) such that
+\[
+    A+BK
+\]
+is Schur stable. Then one computes a robust positively invariant set \(\mathcal E\), ideally the
+minimal set
+\[
+    \mathcal E=\mathcal F_\infty
+    =
+    \bigoplus_{j=0}^{\infty}A_K^j\mathcal W
+\]
+for the error dynamics
+\[
+    e(k+1)=A_Ke(k)+w(k).
+\]
+Next, one computes the tightened constraints
+\[
+    \widetilde{\mathcal X}:=\mathcal X\ominus\mathcal E,
+    \qquad
+    \widetilde{\mathcal U}:=\mathcal U\ominus K\mathcal E.
+\]
+Finally, one chooses the terminal cost \(\ell_f\) and terminal constraint \(\mathcal X_f\)
+satisfying the tube MPC assumptions above.\\
+
+Online, at each sampling instant, the current state \(x\) is measured or estimated. Then the
+tube MPC problem is solved:
+\[
+    (V^\star(x),Z^\star(x))
+    =
+    \argmin_{V,Z}
+    \{J(Z,V)\mid (Z,V)\in\mathcal Z(x)\}.
+\]
+The applied input is
+\[
+    u=K(x-z_0^\star(x))+v_0^\star(x).
+\]
+
+\begin{theorembox}[Tube MPC algorithm]
+Offline:
+\[
+    K
+    \quad\Longrightarrow\quad
+    \mathcal E
+    \quad\Longrightarrow\quad
+    \widetilde{\mathcal X}=\mathcal X\ominus\mathcal E,\quad
+    \widetilde{\mathcal U}=\mathcal U\ominus K\mathcal E
+    \quad\Longrightarrow\quad
+    \ell_f,\mathcal X_f.
+\]
+Online:
+\[
+    x
+    \quad\Longrightarrow\quad
+    (V^\star(x),Z^\star(x))
+    \quad\Longrightarrow\quad
+    u=K(x-z_0^\star(x))+v_0^\star(x).
+\]
+\end{theorembox}
+
+\begin{remark}
+It is often not possible to compute the minimal robust invariant set exactly, because it may have
+infinitely many facets. In practice, one therefore uses a robust invariant outer approximation.
+This approximation is slightly larger than the minimal set, which makes the tube larger and the
+tightened constraints more conservative.
+\end{remark}
+
+\subsubsection{Example data}
+
+We now illustrate the tube MPC construction on the double-integrator. The uncertain system is
+\[
+    x(k+1)
+    =
+    \begin{bmatrix}
+        1 & 1\\
+        0 & 1
+    \end{bmatrix}x(k)
+    +
+    \begin{bmatrix}
+        1\\
+        0.5
+    \end{bmatrix}u(k)
+    +
+    w(k),
+\]
+where the disturbance is bounded in the set
+\[
+    \mathcal W
+    :=
+    \{w\mid |w_1|\leq 0.01,\ |w_2|\leq 0.1\}.
+\]
+The state and input constraints are
+\[
+    \mathcal X
+    :=
+    \{x\mid \norm{x}_\infty\leq 3\},
+    \qquad
+    \mathcal U
+    :=
+    \{u\mid \norm{u}\leq 0.5\}.
+\]
+The stage cost is quadratic:
+\[
+    \ell(z,v)
+    :=
+    z^\top Qz+v^\top Rv,
+\]
+with
+\[
+    Q=
+    \begin{bmatrix}
+        1 & 0\\
+        0 & 1
+    \end{bmatrix},
+    \qquad
+    R=10.
+\]
+
+\begin{theorembox}[Tube MPC example data]
+The example uses a disturbed double integrator with bounded additive disturbance
+\[
+    w\in\mathcal W,
+\]
+box state constraints
+\[
+    \norm{x}_\infty\leq 3,
+\]
+a bounded input constraint
+\[
+    \norm{u}\leq 0.5,
+\]
+and quadratic nominal stage cost
+\[
+    \ell(z,v)=z^\top Qz+v^\top Rv.
+\]
+\end{theorembox}
+
+This example is useful because it shows all the main ingredients of tube MPC: the computation
+of an invariant error set, the tightening of state and input constraints, the choice of terminal
+ingredients, and finally the behavior of the planned and realized tubes.
+
+\subsubsection{Computing the invariant error set}
+
+The first offline step is to choose a stabilizing feedback gain \(K\) such that
+\[
+    A_K:=A+BK
+\]
+is Schur stable. In the example, \(K\) is chosen as the LQR gain for
+\[
+    Q=I,
+    \qquad
+    R=10.
+\]
+This gives
+\[
+    K=
+    \begin{bmatrix}
+        -0.2311 & -0.7011
+    \end{bmatrix}.
+\]
+The corresponding error dynamics are
+\[
+    e(k+1)=A_Ke(k)+w(k),
+    \qquad
+    w(k)\in\mathcal W.
+\]
+The next step is to compute a robust positively invariant set \(\mathcal E\) for this error
+system. Ideally, one would choose the minimal RPI set
+\[
+    \mathcal E=\mathcal F_\infty
+    =
+    \bigoplus_{j=0}^{\infty}A_K^j\mathcal W.
+\]
+This set contains all possible steady-state errors generated by the persistent disturbance under
+the stabilizing feedback \(K\).\\
+
+The role of this set is fundamental. Once
+\[
+    e(k)\in\mathcal E,
+\]
+robust invariance guarantees
+\[
+    e(k+1)=A_Ke(k)+w(k)\in\mathcal E
+    \qquad
+    \forall w(k)\in\mathcal W.
+\]
+Thus the real state remains inside the tube
+\[
+    x(k)\in z(k)\oplus\mathcal E.
+\]
+
+\begin{figure}[!h]
+    \centering
+    % Replace the file name with the corresponding slide/image file.
+    \includegraphics[width=0.4\textwidth]{images/offline_minimal_invariant_set.png}
+    \caption{Offline computation of the robust invariant error set. The LQR feedback gain
+    \(K=[-0.2311\ -0.7011]\) stabilizes \(A+BK\). The red set represents an invariant error
+    bound for the disturbed error dynamics \(e(k+1)=A_Ke(k)+w(k)\).}
+    \label{fig:offline_minimal_invariant_set}
+\end{figure}
+
+\begin{remark}
+The minimal robust invariant set may not be exactly computable with a finite number of
+polyhedral facets. In implementations one often uses an invariant outer approximation. This
+outer approximation is slightly larger than the minimal set, which makes the tube larger and the
+tightened constraints more conservative.
+\end{remark}
+
+\subsubsection{Tightening the state constraints}
+
+After computing the error set \(\mathcal E\), the next offline step is to tighten the state
+constraints. In the example,
+\[
+    \mathcal X
+    =
+    \{x\mid \norm{x}_\infty\leq 3\}.
+\]
+Equivalently,
+\[
+    \mathcal X
+    =
+    \left\{
+    x\ \middle|\ 
+    \begin{bmatrix}
+        I\\
+        -I
+    \end{bmatrix}
+    x
+    \leq
+    3
+    \begin{bmatrix}
+        \mathbf 1\\
+        \mathbf 1
+    \end{bmatrix}
+    \right\}.
+\]
+If the error set is described as
+\[
+    \mathcal E=\{e\mid Fe\leq f\},
+\]
+then the tightened state constraint is
+\[
+    \mathcal X\ominus\mathcal E
+    =
+    \{x\mid x+e\in\mathcal X\ \forall e\in\mathcal E\}.
+\]
+Substituting the halfspace description of \(\mathcal X\), this becomes
+\[
+    \mathcal X\ominus\mathcal E
+    =
+    \left\{
+    x\ \middle|\ 
+    \begin{bmatrix}
+        I\\
+        -I
+    \end{bmatrix}x
+    +
+    \begin{bmatrix}
+        I\\
+        -I
+    \end{bmatrix}e
+    \leq
+    3
+    \begin{bmatrix}
+        \mathbf 1\\
+        \mathbf 1
+    \end{bmatrix}
+    \quad
+    \forall e\in\mathcal E
+    \right\}.
+\]
+Equivalently, each inequality is tightened by the worst possible error in the corresponding
+normal direction:
+\[
+    \mathcal X\ominus\mathcal E
+    =
+    \left\{
+    x\ \middle|\ 
+    \begin{bmatrix}
+        I\\
+        -I
+    \end{bmatrix}x
+    \leq
+    \begin{bmatrix}
+        3-\max\{[1\ 0]e\mid e\in\mathcal E\}\\
+        3-\max\{[0\ 1]e\mid e\in\mathcal E\}\\
+        3-\max\{[-1\ 0]e\mid e\in\mathcal E\}\\
+        3-\max\{[0\ -1]e\mid e\in\mathcal E\}
+    \end{bmatrix}
+    \right\}.
+\]
+The maximizations are linear programs and can be computed offline. The result is a polytope
+with a smaller right-hand side than the original constraint set.
+
+\begin{theorembox}[Polyhedral state constraint tightening]
+If
+\[
+    \mathcal X=\{x\mid H_xx\leq h_x\},
+    \qquad
+    \mathcal E=\{e\mid Fe\leq f\},
+\]
+then
+\[
+    \mathcal X\ominus\mathcal E
+    =
+    \{x\mid H_xx\leq h_x-\eta_x\},
+\]
+where the \(j\)-th component of \(\eta_x\) is
+\[
+    (\eta_x)_j
+    =
+    \max_{e\in\mathcal E}H_{x,j}e.
+\]
+Each component is obtained by solving an offline linear program.
+\end{theorembox}
+
+\begin{figure}[!h]
+    \centering
+    % Replace the file name with the corresponding slide/image file.
+    \includegraphics[width=0.4\textwidth]{images/offline_tightened_state_constraints.png}
+    \caption{State constraint tightening. The original constraint set \(\mathcal X\) (blue) is shrunk by
+    the error set \(\mathcal E\) (red). The tightened set \(\mathcal X\ominus\mathcal E\) contains the
+    admissible nominal tube centers. If \(z_i\in\mathcal X\ominus\mathcal E\) (green), then
+    \(z_i\oplus\mathcal E\subseteq\mathcal X\).}
+    \label{fig:offline_tightened_state_constraints}
+\end{figure}
+
+\subsubsection{Tightening the input constraints}
+
+The input constraint is tightened in the same way. The real input is
+\[
+    u_i=v_i+Ke_i,
+    \qquad
+    e_i\in\mathcal E.
+\]
+Therefore the set of possible real inputs around the nominal input \(v_i\) is
+\[
+    v_i\oplus K\mathcal E.
+\]
+To guarantee \(u_i\in\mathcal U\) for all admissible errors, we impose
+\[
+    v_i\in\mathcal U\ominus K\mathcal E.
+\]
+
+For the scalar input constraint in the example,
+\[
+    \mathcal U
+    =
+    \left\{
+    u\ \middle|\ 
+    \begin{bmatrix}
+        1\\
+        -1
+    \end{bmatrix}u
+    \leq
+    \begin{bmatrix}
+        0.5\\
+        0.5
+    \end{bmatrix}
+    \right\},
+\]
+and if
+\[
+    \mathcal E=\{e\mid Fe\leq f\},
+\]
+then
+\[
+\begin{aligned}
+    \mathcal U\ominus K\mathcal E
+    &=
+    \left\{
+    u\ \middle|\ 
+    \begin{bmatrix}
+        1\\
+        -1
+    \end{bmatrix}u
+    \leq
+    \begin{bmatrix}
+        0.5\\
+        0.5
+    \end{bmatrix}
+    \right\}
+    \ominus
+    \{Ke\mid Fe\leq f\}                                      \\
+    &=
+    \left\{
+    u\ \middle|\ 
+    \begin{bmatrix}
+        1\\
+        -1
+    \end{bmatrix}u
+    \leq
+    \begin{bmatrix}
+        0.5-\max\{Ke\mid Fe\leq f\}\\
+        0.5+\min\{Ke\mid Fe\leq f\}
+    \end{bmatrix}
+    \right\}.
+\end{aligned}
+\]
+Again, the required extrema are computed offline by linear programs.
+
+\begin{theorembox}[Input constraint tightening]
+The tightened input set is
+\[
+    \mathcal U\ominus K\mathcal E
+    =
+    \{v\mid v+Ke\in\mathcal U\ \forall e\in\mathcal E\}.
+\]
+For polyhedral \(\mathcal U\) and \(\mathcal E\), this is obtained by tightening each input
+inequality by the worst possible value of \(Ke\) in that inequality direction.
+\end{theorembox}
+
+\subsubsection{Terminal weights and terminal constraints}
+
+The last offline step is to choose the terminal cost \(\ell_f\) and the terminal set
+\(\mathcal X_f\). These terminal ingredients must satisfy the same kind of conditions as in
+nominal MPC, but now with respect to the tightened constraints.\\
+
+First, the terminal set must be invariant for the nominal system under a local controller
+\(\kappa_f\):
+\[
+    Az+B\kappa_f(z)\in\mathcal X_f
+    \qquad
+    \forall z\in\mathcal X_f.
+\]
+Second, the terminal set must lie inside the tightened state constraint and the terminal input
+must lie inside the tightened input constraint:
+\[
+    \mathcal X_f\subseteq\mathcal X\ominus\mathcal E,
+\]
+\[
+    \kappa_f(z)\in\mathcal U\ominus K\mathcal E
+    \qquad
+    \forall z\in\mathcal X_f.
+\]
+Third, the terminal cost must be a Lyapunov function on \(\mathcal X_f\):
+\[
+    \ell_f(Az+B\kappa_f(z))-\ell_f(z)
+    \leq
+    -\ell(z,\kappa_f(z))
+    \qquad
+    \forall z\in\mathcal X_f.
+\]
+
+\begin{theorembox}[Terminal ingredients for tube MPC]
+The terminal pair \((\ell_f,\mathcal X_f)\) must be chosen so that
+\[
+    Az+B\kappa_f(z)\in\mathcal X_f,
+\]
+\[
+    \mathcal X_f\subseteq\mathcal X\ominus\mathcal E,
+    \qquad
+    \kappa_f(z)\in\mathcal U\ominus K\mathcal E,
+\]
+and
+\[
+    \ell_f(Az+B\kappa_f(z))-\ell_f(z)
+    \leq
+    -\ell(z,\kappa_f(z)).
+\]
+These are the standard nominal MPC terminal conditions applied to the tightened nominal
+system.
+\end{theorembox}
+
+A standard choice is to base the terminal ingredients on the LQR controller. One sets
+\[
+    \kappa_f(z)=Kz,
+\]
+where the same weights \(Q\) and \(R\) used in the MPC stage cost are used to compute \(K\).
+The infinite-horizon cost of the LQR closed loop is
+\[
+    J^\star(z_0)
+    =
+    \sum_{i=0}^{\infty}
+    z_i^\top(Q+K^\top RK)z_i
+    =
+    z_0^\top Pz_0,
+\]
+where \(P\) is the solution of the discrete-time Riccati equation. Therefore one can choose
+\[
+    \ell_f(z)=z^\top Pz.
+\]
+The set \(\mathcal X_f\) is then chosen as a positively invariant set for
+\[
+    z^+=(A+BK)z
+\]
+contained inside the tightened constraints. This is exactly the same construction used in
+nominal MPC, but applied after state and input tightening.
+
+\subsubsection{Online implementation}
+
+Once all offline ingredients have been computed, the online implementation is simple. At each
+sampling time, one measures or estimates the current state \(x\), solves the tube MPC problem
+\[
+    (V^\star(x),Z^\star(x))
+    =
+    \argmin_{V,Z}
+    \{J(Z,V)\mid (Z,V)\in\mathcal Z(x)\},
+\]
+and applies
+\[
+    u=K(x-z_0^\star(x))+v_0^\star(x).
+\]
+Thus the online problem remains a nominal MPC problem in the variables \(Z,V\), but the
+implemented input contains the feedback correction around the optimized tube center.
+
+\begin{theorembox}[Offline/online tube MPC implementation]
+Offline:
+\[
+    K
+    \quad\Longrightarrow\quad
+    \mathcal E
+    \quad\Longrightarrow\quad
+    \widetilde{\mathcal X}:=\mathcal X\ominus\mathcal E,\quad
+    \widetilde{\mathcal U}:=\mathcal U\ominus K\mathcal E
+    \quad\Longrightarrow\quad
+    \ell_f,\mathcal X_f.
+\]
+Online:
+\[
+    x
+    \quad\Longrightarrow\quad
+    (V^\star(x),Z^\star(x))
+    \quad\Longrightarrow\quad
+    u=K(x-z_0^\star(x))+v_0^\star(x).
+\]
+\end{theorembox}
+
+\subsubsection{Planned tubes and possible trajectories}
+
+The effect of the design can be visualized by plotting the planned tubes and the possible future
+trajectories. The nominal tube centers are generated by the optimized nominal dynamics
+\[
+    z_{i+1}=Az_i+Bv_i.
+\]
+Around each center \(z_i\), the tube cross-section is the invariant error set \(\mathcal E\). Hence
+the possible real states lie in
+\[
+    z_i\oplus\mathcal E.
+\]
+The planned tubes are contained in the original state constraints because the nominal centers
+satisfy the tightened constraints
+\[
+    z_i\in\mathcal X\ominus\mathcal E.
+\]
+
+\begin{figure}[!h]
+    \centering
+
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/tubes_example_planned_tubes.png}
+        \caption{Initial state, tube centers, and planned tube trajectories.}
+        \label{fig:tubes_example_planned}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/tubes_example_possible_trajectories.png}
+        \caption{Possible future trajectories inside the planned tubes.}
+        \label{fig:tubes_example_possible}
+    \end{subfigure}
+
+    \caption{Tube MPC example. The nominal trajectory defines the tube centers, while the set
+    \(\mathcal E\) defines the tube cross-section. Different disturbance realizations generate
+    different real trajectories, but all remain inside the tube and therefore inside the original
+    constraints.}
+    \label{fig:tube_mpc_example_planned_and_possible}
+\end{figure}
+
+As time evolves and the optimization is repeated, the nominal tube center moves toward the
+origin. The real disturbed state does not converge exactly to zero, but it remains inside the tube
+and approaches the robust invariant error set around the origin.
+
+\begin{figure}[!h]
+    \centering
+
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/tubes_example_step_1.png}
+        \caption{Early closed-loop behavior.}
+        \label{fig:tubes_example_step_1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/tubes_example_step_2.png}
+        \caption{Intermediate closed-loop behavior.}
+        \label{fig:tubes_example_step_2}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/tubes_example_step_3.png}
+        \caption{State approaching the invariant tube around the origin.}
+        \label{fig:tubes_example_step_3}
+    \end{subfigure}
+
+    \caption{Closed-loop tube MPC evolution. The controller repeatedly replans the nominal tube
+    centers, while the feedback correction keeps the real trajectory inside the invariant tube.}
+    \label{fig:tube_mpc_example_closed_loop_evolution}
+\end{figure}
+
+\subsection{Tube MPC summary}
+
+Tube MPC can be summarized as a structured way to include feedback inside robust MPC while
+keeping the online optimization problem simple. The input is split into two parts:
+\[
+    u_i=v_i+K e_i,
+    \qquad
+    e_i=x_i-z_i.
+\]
+The nominal input \(v_i\) is optimized online and steers the nominal system. The feedback part
+\(Ke_i\) compensates for disturbances and keeps the real trajectory close to the nominal one.\\
+
+The main benefit is that, after the offline computation of \(\mathcal E\), only one constraint
+tightening is needed:
+\[
+    \widetilde{\mathcal X}=\mathcal X\ominus\mathcal E,
+    \qquad
+    \widetilde{\mathcal U}=\mathcal U\ominus K\mathcal E.
+\]
+The online problem has essentially the same structure as nominal MPC, and the same terminal
+cost and terminal set ideas can be used. Moreover, nominal MPC theory applies to the tube
+centers, which gives a clean proof of convergence of the nominal trajectory.\\
+
+The price is conservatism. Tube MPC is generally suboptimal compared with a fully optimal
+closed-loop robust controller, because optimizing over arbitrary feedback policies is extremely
+difficult. The feasible set is also smaller than in nominal MPC, since constraints must be
+tightened. Finally, one must know a disturbance set \(\mathcal W\), and this is often unrealistic
+or conservative in practice.
+
+\begin{theorembox}[Tube MPC: main message]
+Tube MPC splits the input into
+\[
+    u_i=v_i+K(x_i-z_i).
+\]
+It optimizes the nominal trajectory and uses the feedback term to keep all disturbed trajectories
+inside a tube. The method is simple online and has strong stability properties, but it is
+conservative and requires a known disturbance set \(\mathcal W\).
+\end{theorembox}
+
+\section{Comparison of Robust Constraint-Tightening MPC and Tube MPC}
+
+The two robust MPC approaches described in this chapter have the same objective: compensate
+for disturbances in the prediction so that all constraints are satisfied by the real system. They
+differ in how they represent the possible deviation between the nominal and real trajectories.\\
+
+Robust constraint-tightening MPC uses disturbance reachable sets
+\[
+    \mathcal F_k
+    =
+    \bigoplus_{j=0}^{k-1}A_K^j\mathcal W.
+\]
+The nominal MPC problem uses time-varying tightened constraints
+\[
+    \mathcal X\ominus\mathcal F_k,
+\]
+and the initial nominal state is fixed to the measured state:
+\[
+    z_0=x(k).
+\]
+This approach exploits the fact that the initial prediction error is zero. The tube grows along
+the prediction horizon as more disturbances may accumulate.\\
+
+Tube MPC instead uses a robust positively invariant set
+\[
+    \mathcal E.
+\]
+The nominal MPC problem uses constant tightened constraints
+\[
+    \mathcal X\ominus\mathcal E,
+\]
+and the initial tube center is not necessarily equal to the measured state. Instead, it must
+satisfy
+\[
+    x(k)\in z_0\oplus\mathcal E.
+\]
+This formulation is simple and has strong recursive feasibility and stability properties, but the
+constant tube can be more conservative.
+
+\begin{theorembox}[Robust MPC for uncertain systems]
+Constraint-tightening MPC:
+\[
+    \text{DRS } \mathcal F_k
+    \quad\Longrightarrow\quad
+    \text{nominal MPC with } \mathcal X\ominus\mathcal F_k,
+    \qquad
+    z_0=x(k).
+\]
+Tube MPC:
+\[
+    \text{RPI set } \mathcal E
+    \quad\Longrightarrow\quad
+    \text{nominal MPC with } \mathcal X\ominus\mathcal E,
+    \qquad
+    x(k)\in z_0\oplus\mathcal E.
+\]
+\end{theorembox}
+
+The use of an RPI set \(\mathcal E\) increases the complexity of the offline design and may also
+complicate the online implementation, depending on the representation of the set. Tube MPC can
+also have a smaller feasible set, because the same tube cross-section is imposed throughout the
+horizon. On the other hand, the concept is simple, the online problem remains close to nominal
+MPC, and the robust stability properties are strong.
+
 \section{Summary}
 
-This chapter introduced a first robust MPC formulation for linear systems affected by bounded
-additive disturbances. The main difference from nominal MPC is that a fixed input sequence no
-longer generates a single predicted trajectory. Instead, it generates a family of possible
-trajectories, one for each admissible disturbance sequence.\\
+The main idea of robust MPC for uncertain systems is to compensate for noise in the prediction
+so that the real state and input satisfy the constraints for all admissible disturbances. This
+requires replacing single predicted trajectories with sets of possible trajectories, or tubes.\\
 
-The cost can be treated in different ways. One may minimize an expected cost, a worst-case
-cost, or, as in this lecture, a nominal cost. In the formulation considered here, robustness is not
-introduced through the objective, but through the constraints.\\
-The key mechanism is constraint tightening. Since the uncertain state satisfies
+The robust methods discussed here are conservative because they require a disturbance set
+\(\mathcal W\) that contains all possible disturbances. If \(\mathcal W\) is chosen too small, the
+guarantees may fail. If it is chosen too large, the controller becomes overly cautious and the
+feasible set may become small. Moreover, robust MPC formulations are generally more complex
+than nominal MPC, even when the final online problem is simple.\\
+
+The main benefit is that the feasible set becomes robust invariant. Therefore one knows exactly
+from which states the controller can guarantee constraint satisfaction for all future times. The
+methods are also easier to tune in a systematic way, because the designer can trade off robustness
+against performance through the choice of \(\mathcal W\), the feedback gain \(K\), and the tube
+size.\\
+
+For tube MPC in particular, the central construction is
 \[
-    \phi_i(x_0,U,W)\in x_i\oplus\mathcal F_i,
+    u_i=v_i+K(x_i-z_i),
+\]
+with an invariant error set
+\[
+    \mathcal E
+\]
+and tightened nominal constraints
+\[
+    z_i\in\mathcal X\ominus\mathcal E,
     \qquad
-    \mathcal F_i=\bigoplus_{j=0}^{i-1}A^j\mathcal W,
+    v_i\in\mathcal U\ominus K\mathcal E.
 \]
-robust satisfaction of \(x_i\in\mathcal X\) is guaranteed by imposing
-\[
-    x_i\in\mathcal X\ominus\mathcal F_i
-\]
-on the nominal prediction. The same construction applies to the terminal constraint, leading to
-\[
-    x_N\in\mathcal X_f\ominus\mathcal F_N.
-\]
-Robust open-loop MPC therefore solves a nominal finite-horizon optimal control problem with
-tightened constraints. This guarantees constraint satisfaction for all admissible disturbances,
-but it can be conservative because future inputs are planned open-loop. This motivates the
-feedback-based robust MPC methods introduced next.
+Under the terminal assumptions, the nominal tube center converges to the origin, while the real
+state converges to the robust invariant set \(\mathcal E\). Thus robust MPC replaces exact
+convergence to the origin by convergence to a guaranteed neighborhood of the origin, which is
+the natural stability objective in the presence of persistent disturbances.
