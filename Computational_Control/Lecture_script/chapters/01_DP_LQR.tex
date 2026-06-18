@@ -101,7 +101,7 @@ And $V_T(x_T) = g_T(x_T)$
 \end{theorembox}
 A reasonable question at this point would be, in which cases is this stage problem formulation simple to solve ? We can list three scenarios:
 \begin{itemize}
-    \item Decision space $\mathcal{\tilde{U}}$ is convec , or maybe finite.
+    \item Decision space $\mathcal{\tilde{U}}$ is convex, or maybe finite.
     \item If $g_t$ is convex in $u_t$.
     \item If $V_{t+1}$ evaluated at the future step $f_t$ is convex in $u_t$.
 \end{itemize}
@@ -113,7 +113,7 @@ The LQR problem is a special case of the optimal control problem, in which we ha
     \item Markovian update and linear dynamics
     $$ x_{t+1} = A_t x_t + B_t u_t$$
     \item Quadratic cost function:
-    $$ \sum_{t=0}^{T-1} \left( x_t^\top\, Q_t\, x_t + u_t^\top\, R_t\, u_t \right) + x_T^\top \,S \,x_T \quad \text{with }Q,S\geq 0 \, , \, R >0 $$
+    $$ \sum_{t=0}^{T-1} \left( x_t^\top\, Q_t\, x_t + u_t^\top\, R_t\, u_t \right) + x_T^\top \,S \,x_T \quad \text{with }Q,S\succeq 0 \, , \, R \succ 0 $$
     \item Value function (i.e. minimum cost to go starting from $x$ at time $t$) :
     $$V_t (x) = \min_{u_t,\dots,u_{T-1}} \sum_{k=t}^{T-1} \left( x_k^\top\, Q_k\, x_k + u_k^\top\, R_k\, u_k \right) + x_T^\top \,S \,x_T$$
     \begin{align*}
@@ -182,7 +182,7 @@ V_t(x)
 + x^\top A^\top P_{t+1} A x\\
 &\textcolor{red}{- \bigl((R+B^\top P_{t+1} B)^{-1} B^\top P_{t+1} A x\bigr)^\top} \bigr( \textcolor{red}{-}(R+B^\top P_{t+1} B)\textcolor{red}{(R+B^\top P_{t+1} B)^{-1} B^\top P_{t+1} A x} + 2 B^\top P_{t+1} A x \bigl) \\[6pt]
 &=x^\top Q x
-+ x^\top A^\top P_{t+1} A x + 
++ x^\top A^\top P_{t+1} A x 
 - \bigl((R+B^\top P_{t+1} B)^{-1} B^\top P_{t+1} A x\bigr)^\top \bigl( B^\top P_{t+1} A x \bigr) \\[6pt]
 &= x^\top Q x
 + x^\top A^\top P_{t+1} A x
@@ -219,13 +219,13 @@ We can do a quick comparison of the computational cost of using these equations 
     \item \textbf{Offline computation}
     \begin{itemize}
         \item $n\times n$ matrix multiplications to compute $P_t$ for $t=T-1,\dots,0$
-        \item $m\times m$ matrix inversions to compute $\Gamma_t$ for $t=T-1,\dots,0$
+        \item $m\times m$ matrix inversions to compute $\Gamma_t$ and $P_t$ for $t=T-1,\dots,0$
         \item $T$ iterations to compute $P_t$ and $\Gamma_t$ for $t=T-1,\dots,0$
     \end{itemize}
     \item \textbf{Online computation}
     \begin{itemize}
         \item Storage of $T$ $m\times n$ matrices $\Gamma_t$ for $t=T-1,\dots,0$
-        \item $m\times m$ matrix multiplications to compute $u_t$ at each time step, given $x_t$
+        \item $m\times n$ matrix multiplications to compute $u_t$ at each time step, given $x_t$
     \end{itemize}
 \end{itemize}
 
@@ -312,7 +312,7 @@ But how do we compute the optimal policy for the infinite-horizon LQR problem ? 
 \begin{theorembox}[Algebraic Riccati Equation]
 The iteration 
 $$P_{t-1} = Q + A^\top P_t A - A^\top P_t B (R + B^\top P_t B)^{-1} B^\top P_t A\qquad P_0 = 0$$
-converges, for $t \to -\infty$, to a unique positive semidefinite solution \(P_{\infty} \succ 0\) of the algebraic Riccati equation
+converges, for $t \to -\infty$, to a unique positive definite solution \(P_{\infty} \succ 0\) of the algebraic Riccati equation
 $$ \textcolor{red}{P} = Q + A^\top \textcolor{red}{P} A - A^\top \textcolor{red}{P} B (R + B^\top \textcolor{red}{P} B)^{-1} B^\top \textcolor{red}{P} A $$
 \end{theorembox}
 We can show that then the optimal feedback control in the infinite-horizon case is given by
