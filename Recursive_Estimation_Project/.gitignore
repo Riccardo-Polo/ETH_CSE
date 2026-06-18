@@ -1,0 +1,3 @@
+/.venv
+/.docker-codex
+./__pycache__
