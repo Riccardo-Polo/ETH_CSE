@@ -105,7 +105,7 @@ Two different questions can be asked:
     \item What is the optimal open-loop solution $(\mathbf{x}^*, \mathbf{u}^*)$?
     \item What is the MPC feedback law $x \mapsto u^*(x)$ obtained by solving the problem in a receding horizon fashion?
 \end{enumerate}
-To solve this we observe that the cost is not quadratic and that the cost of applying inouts is discounted over time. Furthermore the state is penalized only at the end of the horizon.\\
+To solve this we observe that the cost is not quadratic and that the cost of applying inputs is discounted over time. Furthermore the state is penalized only at the end of the horizon.\\
 Thus the optimal solution is to simply wait for the last time step and then apply $u_{T} = -x_{T}$, which yields a cost of $|x_0|^2$.\\
 In contrast, the MPC feedback law is given by the control law $x \mapsto u^*(x)=0$. This is because at each time step the optimization problem is solved with a shifted horizon, and the optimal input sequence is always to wait until the end of the horizon and then apply $u_{t+T}=-x_{t+T}$. Therefore, at each time step, the first input of the optimal sequence is zero.\\
 A key observation is that the \textbf{optimal trajectory} associated with the finite-horizon problem is, in general, \textbf{never realized in closed loop}, even in the absence of disturbances or model mismatch. This is because at each time step the optimization problem is re-solved with a shifted horizon, leading to a different optimal sequence than the one computed previously.
@@ -720,7 +720,7 @@ then the plant can be augmented as
 \[
 \begin{bmatrix}
 x_{t+1}\\
-d_{t+1}
+\hat{d}_{t+1}
 \end{bmatrix}
 =
 \begin{bmatrix}
@@ -729,7 +729,7 @@ A & B_d\\
 \end{bmatrix}
 \begin{bmatrix}
 x_t\\
-d_t
+\hat{d}_t
 \end{bmatrix}
 +
 \begin{bmatrix}
@@ -749,4 +749,431 @@ A_d = I.
 \]
 More generally, the choice of $A_d$ determines which class of disturbances the controller is able to reject. In the spirit of the internal model principle, one integrator is associated with rejection of step-like disturbances, while more complex models are needed for ramps or periodic signals.\\
 
-\textbf{TO FINISH}
+\subsubsection{Robust satisfaction of constraints}
+
+The disturbance-rejection mechanisms discussed so far are mainly concerned with improving
+tracking and reducing steady-state offsets. However, in constrained MPC there is an additional,
+and often more critical, question:
+
+\begin{center}
+\emph{Can we guarantee that the state and input constraints are satisfied despite disturbances?}
+\end{center}
+
+This question is central in safety-critical applications. For instance, in an irrigation system,
+the controller may decide how much water to apply to a field based on a prediction of future
+weather conditions. The relevant disturbances include temperature, solar radiation, rainfall,
+and evapotranspiration. The constraints express that the soil moisture should not be too low
+(under-watering) and not too high (over-watering). A nominal MPC controller may perform well
+for the predicted weather, but it may violate the constraints if the actual rainfall or temperature
+differs from the forecast. Robust MPC aims to explicitly account for this uncertainty.
+
+There are several possible meanings of ``constraint satisfaction under uncertainty''. The most
+important ones are the following.
+
+\begin{theorembox}[Different robustness specifications]
+Consider a disturbed system and constraints of the form
+\[
+x_k \in \mathcal X, \qquad u_k \in \mathcal U.
+\]
+Depending on the available information on the disturbance, one may require:
+
+\begin{enumerate}
+    \item \textbf{Guaranteed constraint satisfaction}
+    \[
+    x_k(w) \in \mathcal X,\qquad u_k(w)\in \mathcal U
+    \qquad \forall w \in \mathcal W.
+    \]
+    The constraints must hold for every admissible disturbance realization.
+
+    \item \textbf{Constraint satisfaction with high probability}
+    \[
+    \mathbb P\big(x_k \in \mathcal X,\ u_k\in \mathcal U\big) \ge 1-\varepsilon.
+    \]
+    Small probabilities of violation are allowed.
+
+    \item \textbf{Scenario or sample-based satisfaction}
+    \[
+    x_k^{(s)}\in \mathcal X,\qquad u_k^{(s)}\in \mathcal U,
+    \qquad s=1,\dots,N,
+    \]
+    where the constraints are imposed only on a finite number of disturbance samples.
+
+    \item \textbf{Bounded expected violation}
+    \[
+    \mathbb E\left[\max\{0,h(x_k,u_k)\}\right]\le \eta,
+    \]
+    where the constraint is written as $h(x,u)\le 0$.
+
+    \item \textbf{Risk-sensitive satisfaction, for instance through CVaR}
+    \[
+    \operatorname{CVaR}_{1-\varepsilon}\big(h(x_k,u_k)\big)\le 0.
+    \]
+    This controls not only the probability of violation, but also the size of the violation
+    in the tail of the distribution.
+\end{enumerate}
+\end{theorembox}
+
+The strongest requirement is the first one: constraints must hold for all admissible
+disturbances. This leads to \textbf{robust MPC}. The other formulations are less conservative
+and are useful when a probability distribution of the disturbance is available, or when occasional
+small violations are acceptable.
+
+\subsubsection{Prior information on disturbances}
+
+We now assume that some prior information on the disturbance is available. Consider the
+discrete-time system
+\[
+x_{t+1}=f(x_t,u_t,w_t),
+\]
+where $w_t$ is an unknown disturbance. In the linear additive case this becomes
+\[
+x_{t+1}=Ax_t+Bu_t+Dw_t.
+\]
+
+Different types of prior information can be used.
+
+\paragraph{Finite disturbance set.}
+One possibility is that the disturbance can take only finitely many values:
+\[
+w_t \in \mathcal D := \{w^0,w^1,\dots,w^p\}.
+\]
+This situation arises, for example, when the uncertainty is represented by a finite ensemble of
+forecast scenarios.
+
+\paragraph{Convex disturbance set.}
+If the finite set is interpreted as a set of extreme cases, one can define the admissible
+disturbance set as the convex hull
+\[
+w_t \in \operatorname{co}\{w^0,w^1,\dots,w^p\}.
+\]
+For linear dynamics and convex constraints, this is particularly convenient. Since the predicted
+state depends affinely on the disturbance, and linear inequalities are convex constraints, it is
+often enough to check the constraints on the extreme disturbance scenarios.
+
+\paragraph{Probabilistic disturbance model.}
+If a distribution is available, one can write
+\[
+w_t \sim \mathbb W,
+\]
+where $\mathbb W$ denotes the probability law of the disturbance. In this case the controller
+may optimize expected performance, impose chance constraints, or use risk measures such as
+CVaR.
+
+A disturbance sequence over a horizon $T$ is denoted by
+\[
+\mathbf w = (w_0,w_1,\dots,w_{T-1}).
+\]
+If the disturbances are selected from a finite set, then an ensemble of possible disturbance
+sequences is a set
+\[
+\mathbb W_T \subseteq \mathcal D^T.
+\]
+Each element $\mathbf w\in \mathbb W_T$ represents one possible future scenario.
+
+\subsubsection{Open-loop robust MPC}
+
+Let us first consider the most direct robust MPC formulation. We use the linear additive model
+\[
+x_{k+1}=Ax_k+Bu_k+Dw_k.
+\]
+At the current state $x$, we predict one state trajectory for each possible disturbance scenario.
+The important point is that the input sequence
+\[
+u_0,u_1,\dots,u_{T-1}
+\]
+is the same for all disturbance scenarios. Hence, inside the optimization problem the future
+inputs are open-loop: they are planned now and are not allowed to depend on which disturbance
+will actually occur in the future.
+
+Let $\bar{\mathbf w}$ be a nominal disturbance sequence, for example the zero disturbance or
+the mean forecast. A common robust MPC formulation is the following.
+
+\begin{theorembox}[Open-loop robust MPC with nominal cost]
+Given the current state $x$, solve
+\begin{align*}
+\min_{\{u_k\},\,\{x_k^{\mathbf w}\}} \quad
+& \sum_{k=0}^{T-1} g_k\left(x_k^{\bar{\mathbf w}},u_k\right)
++ g_T\left(x_T^{\bar{\mathbf w}}\right) \\
+\text{s.t.}\quad
+& x_{k+1}^{\mathbf w}
+= A x_k^{\mathbf w}+Bu_k+D w_k,
+\qquad k=0,\dots,T-1,\quad \mathbf w\in\mathbb W_T,\\
+& x_0^{\mathbf w}=x,
+\qquad \mathbf w\in\mathbb W_T,\\
+& x_k^{\mathbf w}\in\mathcal X,
+\qquad k=0,\dots,T,\quad \mathbf w\in\mathbb W_T,\\
+& u_k\in\mathcal U,
+\qquad k=0,\dots,T-1.
+\end{align*}
+The MPC input applied to the plant is the first element of the optimizer:
+\[
+u_t = u_0^*(x).
+\]
+\end{theorembox}
+
+This formulation separates performance and safety. The objective may be evaluated only on
+the nominal trajectory, while the constraints are imposed on all admissible disturbance
+scenarios. In this way, the controller tries to behave well for the nominal forecast, but it keeps
+all possible disturbed trajectories inside the admissible set.
+
+The same idea can be made more conservative by optimizing the worst-case cost:
+\[
+\min_{\{u_k\}} \max_{\mathbf w\in\mathbb W_T}
+\left(
+\sum_{k=0}^{T-1} g_k(x_k^{\mathbf w},u_k)+g_T(x_T^{\mathbf w})
+\right),
+\]
+subject again to robust constraints. This protects also the performance against the worst
+disturbance, not only the constraints.
+
+The advantage of open-loop robust MPC is that it is conceptually simple. The disadvantage is
+that it can be extremely conservative. The reason is that the same future input sequence must
+work for every possible future disturbance realization.
+
+\subsubsection{Why open-loop robust MPC can be too conservative}
+
+The conservatism of open-loop robust MPC can be seen from a very simple scalar example:
+\[
+x_{t+1}=x_t+u_t+w_t,
+\qquad |w_t|\le 0.5.
+\]
+Consider the stage cost
+\[
+g(x,u)=x^2+u^2,
+\]
+the state constraint
+\[
+|x_t|\le 1,
+\]
+and no input constraint. We take a finite prediction horizon and ask that the predicted state
+constraint be satisfied for all admissible disturbances.
+
+By iterating the dynamics, the state at the end of the prediction horizon can be written as
+\[
+x_5 = x_0+\sum_{k=1}^{4}u_k+\sum_{k=1}^{4}w_k.
+\]
+Therefore, the terminal constraint $|x_5|\le 1$ requires
+\[
+-1 \le x_0+\sum_{k=1}^{4}u_k+\sum_{k=1}^{4}w_k \le 1.
+\]
+
+Now consider two extreme disturbance realizations.
+
+\paragraph{All disturbances positive.}
+If
+\[
+w_k=0.5,\qquad k=1,\dots,4,
+\]
+then
+\[
+\sum_{k=1}^{4}w_k=2.
+\]
+The terminal constraint implies
+\[
+-1 \le x_0+\sum_{k=1}^{4}u_k+2 \le 1,
+\]
+or equivalently
+\[
+-x_0-3 \le \sum_{k=1}^{4}u_k \le -x_0-1.
+\]
+
+\paragraph{All disturbances negative.}
+If
+\[
+w_k=-0.5,\qquad k=1,\dots,4,
+\]
+then
+\[
+\sum_{k=1}^{4}w_k=-2.
+\]
+The terminal constraint implies
+\[
+-1 \le x_0+\sum_{k=1}^{4}u_k-2 \le 1,
+\]
+or equivalently
+\[
+-x_0+1 \le \sum_{k=1}^{4}u_k \le -x_0+3.
+\]
+
+Thus, the same open-loop input sequence must satisfy
+\[
+-x_0-3 \le \sum_{k=1}^{4}u_k \le -x_0-1
+\]
+and
+\[
+-x_0+1 \le \sum_{k=1}^{4}u_k \le -x_0+3
+\]
+at the same time. These two intervals are disjoint. Hence, no open-loop input sequence can
+guarantee the terminal state constraint for all admissible disturbance realizations.
+
+This conclusion is surprising at first, because a very simple feedback controller is feasible.
+Indeed, consider
+\[
+u_t=-x_t.
+\]
+Then the closed-loop dynamics become
+\[
+x_{t+1}=w_t.
+\]
+Since $|w_t|\le 0.5$, it follows that
+\[
+|x_{t+1}|\le 0.5 < 1.
+\]
+Therefore, the state constraint is satisfied for every admissible disturbance.
+
+The lesson is the following.
+
+\begin{theorembox}[Open-loop robust feasibility versus feedback feasibility]
+An open-loop robust MPC problem may be infeasible even when a feasible robust feedback
+controller exists.
+
+The issue is not the lack of a stabilizing control law. The issue is that the robust optimization
+problem forces one single future input sequence to work for all possible future disturbance
+realizations.
+\end{theorembox}
+
+This also clarifies a subtle point about MPC. MPC is a feedback controller because at every
+sampling time it measures the current state and recomputes the first input:
+\[
+u_t=u^*(x_t).
+\]
+However, the optimization problem solved at time $t$ usually optimizes over an open-loop
+sequence
+\[
+u_0,\dots,u_{T-1}.
+\]
+Thus, within the predicted future, the inputs are not allowed to adapt to future measurements.
+Robustness against all disturbance sequences can then become overly conservative.
+
+\subsubsection{Robust MPC over policies}
+
+The natural way to reduce this conservatism is to optimize not over input sequences, but over
+input policies:
+\[
+u_k=\pi_k(x_k), \qquad k=0,\dots,T-1.
+\]
+The corresponding robust optimal control problem is
+\begin{align*}
+\min_{\pi_0,\dots,\pi_{T-1}} \quad
+& \mathcal J(\pi_0,\dots,\pi_{T-1};x)\\
+\text{s.t.}\quad
+& x_{k+1}^{\mathbf w}
+= A x_k^{\mathbf w}
++ B \pi_k\left(x_k^{\mathbf w}\right)
++ D w_k,
+\qquad \mathbf w\in\mathbb W_T,\\
+& x_0^{\mathbf w}=x,
+\qquad \mathbf w\in\mathbb W_T,\\
+& x_k^{\mathbf w}\in\mathcal X,
+\qquad k=0,\dots,T,\quad \mathbf w\in\mathbb W_T,\\
+& \pi_k\left(x_k^{\mathbf w}\right)\in\mathcal U,
+\qquad k=0,\dots,T-1,\quad \mathbf w\in\mathbb W_T.
+\end{align*}
+
+This formulation is much less conservative, because different future states may lead to
+different future inputs. In the scalar example above, the policy
+\[
+\pi(x)=-x
+\]
+is feasible, whereas no open-loop sequence is feasible.
+
+For finite disturbance sets, the policy optimization viewpoint can be represented through a
+\textbf{scenario tree}. Each node corresponds to a possible state reached after a particular
+disturbance history. The control action may depend on the node, hence on the information
+available up to that time. However, the controller must satisfy a non-anticipativity condition:
+two scenarios that have the same disturbance history up to time $k$ must use the same input
+at time $k$.
+
+The main drawback is computational complexity. If there are $p+1$ possible disturbance values
+at each time step, then the number of possible scenarios over a horizon $T$ grows like
+\[
+(p+1)^T.
+\]
+Therefore, exact robust MPC over policies quickly becomes intractable.
+
+\subsubsection{Nested feedback for robust MPC}
+
+A practical compromise is to keep the robust MPC problem relatively simple, but to add a
+pre-designed feedback controller inside the prediction model. This idea is often described as
+wrapping the plant around a stabilizing controller.
+
+Consider again the linear additive system
+\[
+x_{t+1}=Ax_t+Bu_t+Dw_t.
+\]
+Instead of optimizing directly over $u_t$, we parametrize the input as
+\[
+u_t = v_t + Lx_t,
+\]
+where $L$ is a fixed feedback gain and $v_t$ is the new decision variable optimized by MPC.
+Substituting into the dynamics gives
+\[
+x_{t+1}
+= A x_t+B(v_t+Lx_t)+Dw_t
+= (A+BL)x_t+Bv_t+Dw_t.
+\]
+
+Thus the robust MPC problem is solved for the pre-stabilized system
+\[
+x_{t+1}=(A+BL)x_t+Bv_t+Dw_t.
+\]
+
+\begin{theorembox}[Nested robust MPC parametrization]
+Choose a feedback gain $L$ such that $A+BL$ is stable. For discrete-time systems this means
+that $A+BL$ is Schur, i.e., all eigenvalues lie strictly inside the unit disk. For continuous-time
+systems the analogous condition is that $A+BL$ is Hurwitz.
+
+Then solve a robust MPC problem in the variables $v_0,\dots,v_{T-1}$:
+\begin{align*}
+\min_{\{v_k\},\,\{x_k^{\mathbf w}\}} \quad
+& \sum_{k=0}^{T-1} g_k\left(x_k^{\bar{\mathbf w}},v_k+Lx_k^{\bar{\mathbf w}}\right)
++ g_T\left(x_T^{\bar{\mathbf w}}\right)\\
+\text{s.t.}\quad
+& x_{k+1}^{\mathbf w}
+= (A+BL)x_k^{\mathbf w}+Bv_k+Dw_k,
+\qquad \mathbf w\in\mathbb W_T,\\
+& x_0^{\mathbf w}=x,
+\qquad \mathbf w\in\mathbb W_T,\\
+& x_k^{\mathbf w}\in\mathcal X,
+\qquad k=0,\dots,T,\quad \mathbf w\in\mathbb W_T,\\
+& v_k+Lx_k^{\mathbf w}\in\mathcal U,
+\qquad k=0,\dots,T-1,\quad \mathbf w\in\mathbb W_T.
+\end{align*}
+The control input applied to the plant is
+\[
+u_t=v_0^*(x)+Lx_t.
+\]
+\end{theorembox}
+
+The role of the two terms is different:
+
+\begin{itemize}
+    \item The sequence $v_0,\dots,v_{T-1}$ is optimized by MPC and steers the nominal
+    trajectory.
+
+    \item The feedback term $Lx_t$ reacts immediately to the current state and attenuates
+    the effect of disturbances.
+
+    \item The gain $L$ is chosen offline using any suitable method, for example pole placement,
+    LQR, or another robust control design.
+\end{itemize}
+
+This architecture reduces conservatism because disturbances are no longer left to accumulate
+open-loop over the prediction horizon. The feedback gain $L$ continuously pulls the disturbed
+trajectories back toward the nominal one. Geometrically, the disturbed trajectories form a
+tube around the nominal trajectory, and the feedback gain controls the width of this tube.
+
+This is the basic idea behind \textbf{tube-based robust MPC}. The MPC layer plans a nominal
+trajectory, while the ancillary feedback controller keeps the real trajectory inside a robust tube
+around it. The constraints are then tightened so that, even after accounting for the tube width,
+the true state and input remain feasible.
+
+It is important to observe that this parametrization is useful only in the presence of
+disturbances or uncertainty. If $w_t=0$ for all $t$, then there is no advantage in writing
+\[
+u_t=v_t+Lx_t.
+\]
+Indeed, for a nominal trajectory, the optimized variable $v_t$ can simply absorb the term
+$Lx_t$. The benefit appears when different disturbance realizations produce different states:
+the term $Lx_t$ then provides an automatic feedback correction without requiring the MPC
+optimizer to choose a different open-loop sequence for every possible future disturbance.
