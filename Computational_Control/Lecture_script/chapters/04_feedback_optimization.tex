@@ -83,7 +83,7 @@ So $H$ is the steady-state gain from the manipulated input $u$ to the output $y$
 
 This also answers the question about the conditions on $A$. In order to define the steady-state map in this form, $A$ must be invertible. In particular, if the plant is exponentially stable, then all eigenvalues of $A$ have strictly negative real part. Hence $0$ cannot be an eigenvalue of $A$, and therefore $A$ is automatically nonsingular. So invertibility of $A$ is not an additional restriction here: it already follows from exponential stability.\\
 
-The conclusion is that, f\textbf{for a fast and exponentially stable plant}, the dynamic relation between $u$ and $y$ can be replaced at steady state by the static map
+The conclusion is that, \textbf{for a fast and exponentially stable plant}, the dynamic relation between $u$ and $y$ can be replaced at steady state by the static map
 \[
 y = Hu + Lw,
 \]
@@ -409,8 +409,8 @@ Using the chain rule, the gradient of $J$ is
 +
 \nabla_u h(u;w)^\top \nabla_y \Phi(u,h(u;w))
 +
-\nabla_u h(u;w)^\top \nabla_y p(h(u;w)).
-\]
+\nabla_u h(u;w)^\top \nabla_y p(h(u;w))
+\].
 Therefore, the gradient descent algorithm becomes
 \[
 u_{k+1}
@@ -418,25 +418,25 @@ u_{k+1}
 u_k
 -
 \alpha\Bigl(
-\nabla_u \Phi(u_k,h(u_k;w))
+\nabla_u \Phi(u_k,\textcolor{red}{h(u_k;w)})
 +
-\nabla_u h(u_k;w)^\top \nabla_y \Phi(u_k,h(u_k;w))
+\nabla_u h(u_k;w)^\top \nabla_y \Phi(u_k,\textcolor{red}{h(u_k;w)})
 +
-\nabla_u h(u_k;w)^\top \nabla_y p(h(u_k;w))
+\nabla_u h(u_k;w)^\top \nabla_y p(\textcolor{red}{h(u_k;w)})
 \Bigr).
 \]
-This is the ideal algorithm one would write if the steady-state map $h$ were exactly known. However, in feedback optimization we do not want to evaluate the cost only on the basis of the model output $h(u_k;w)$; rather, we want to use the \emph{measured} plant output. Denoting by $y_k$ the measured output corresponding to the current input $u_k$, the update law becomes
+This is the ideal algorithm one would write if the steady-state map $h$ were exactly known. However, in feedback optimization we do not want to evaluate the cost only on the basis of the model output $h(u_k;w)$; rather, we want to use the \emph{measured} plant output. Denoting by $\textcolor{red}{y_k}$ the measured output corresponding to the current input $u_k$, the update law becomes
 \[
 u_{k+1}
 =
 u_k
 -
 \alpha\Bigl(
-\nabla_u \Phi(u_k,y_k)
+\nabla_u \Phi(u_k,\textcolor{red}{y_k})
 +
-\nabla_u h(u_k;w)^\top \nabla_y \Phi(u_k,y_k)
+\nabla_u h(u_k;w)^\top \nabla_y \Phi(u_k,\textcolor{red}{y_k})
 +
-\nabla_u h(u_k;w)^\top \nabla_y p(y_k)
+\nabla_u h(u_k;w)^\top \nabla_y p(\textcolor{red}{y_k})
 \Bigr).
 \]
 This is the \emph{gradient descent controller}: the optimization step is corrected using the actual output measurement $y_k$, while the Jacobian $\nabla_u h(u_k;w)$ is still taken from the model. The input is finally constrained to lie in $\mathcal U$, for instance by saturation or projection.\\
@@ -544,7 +544,7 @@ is generally complicated. Even when $\mathcal Y$ is a simple set, its inverse im
 \[
 \tilde{\mathcal U}=\mathcal U\cap h^{-1}(\mathcal Y;w)
 \]
-can be numerically difficult and conceptually unpleasant. This is exactly the issue highlighted by the figures: a simple admissible set in the output space may correspond, in the input space, to a distorted and difficult set.\\
+can be numerically difficult and conceptually unpleasant. This is exactly the issue highlighted by figure \ref{fig:inverse-image-geometry}: a simple admissible set in the output space may correspond, in the input space, to a distorted and difficult set.\\
 
 To make this approach practical, one would like a good approximation of the set $h^{-1}(\mathcal Y;w)$ that satisfies two properties:
 \begin{itemize}
@@ -830,7 +830,7 @@ u_k
 +
 \nabla_u h(u_k;w)^\top \nabla_y \Phi(u_k,y_k)
 +
-\nabla_u h(u_k;w)^\top \nabla g(y_k)^\top \lambda_k
+\textcolor{red}{\nabla_u h(u_k;w)^\top \nabla g(y_k)^\top \lambda_k}
 \Bigr),
 \]
 and
@@ -848,7 +848,7 @@ Here:
 
 The interpretation of these equations is very important.
 
-The primal update for $u_k$ has the same structure as the gradient-based controllers discussed before, but now there is an extra term,
+The primal update for $u_k$ has the same structure as the gradient-based controllers discussed before, but now there is an \textcolor{red}{extra term},
 \[
 \nabla_u h(u_k;w)^\top \nabla g(y_k)^\top \lambda_k,
 \]
