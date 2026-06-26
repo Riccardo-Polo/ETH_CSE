@@ -1,0 +1,1195 @@
+\subsection{Motivation: stochastic decision problems}
+
+So far, most of the control problems considered in these notes have been written in the form of
+a deterministic state-space model
+\[
+x_{k+1} = f(x_k,u_k),
+\]
+possibly with constraints and disturbances. This representation is extremely useful when the
+state is continuous, the dynamics are known with sufficient accuracy, and the effect of the input
+can be described by deterministic equations.\\
+
+However, there are many systems for which this description is not the most natural one. A
+typical example is the control of traffic lights at an intersection. The control input is discrete:
+at each time we decide which light is red and which light is green. The state may also be
+naturally discrete: for instance, the number of vehicles in each queue. Moreover, the evolution
+is stochastic, because new cars arrive randomly. In such a setting, writing a smooth deterministic
+state-space model is not very convenient.\\
+Consider, for simplicity, a single queue with queue length $q_k$. At each time step, a new
+vehicle arrives with probability $p$. If the light is red, no cars are served. If the light is green,
+up to three cars can leave the queue. A simple model is therefore
+\[
+a_k =
+\begin{cases}
+1 & \text{with probability } p\\
+0 & \text{with probability } 1-p
+\end{cases}
+\]
+and
+\[
+q_{k+1}
+=
+\begin{cases}
+q_k + a_k & \text{if the light is red}\\
+\max(0,q_k-3) + a_k & \text{if the light is green}.
+\end{cases}
+\]
+If the queue length is bounded by a maximum capacity $q_{\max}$, one can additionally saturate
+the update at $q_{\max}$.\\
+This is still a Markovian model: once the current queue length \(q_k\) and the current action
+are known, the probability distribution of \(q_{k+1}\) is fully determined. The future does not
+depend on the entire past history of the queue, but only on the present state and the action
+chosen now. The difference with the deterministic models used before is that the next state is
+not a single value, but a probability distribution over possible next states.\\
+This motivates the introduction of Markov Decision Processes.
+
+\subsection{Finite Markov Decision Processes}
+
+A finite Markov Decision Process, or MDP, is a controlled stochastic dynamical system described
+by the following objects:
+\[
+\cX = {1,\dots,N},
+\qquad
+\cU = {1,\dots,M},
+\]
+where $(\cX)$ is the finite set of states and $(\cU)$ is the finite set of actions.\\
+The dynamics are described by transition probabilities
+\[
+P : \cX \times \cU \times \cX \to [0,1].
+\]
+We write
+\[
+P^u_{x,x'}
+=
+\Prob[x_{k+1}=x' \mid x_k=x,\ u_k=u].
+\]
+Thus \(P^u_{x,x'}\) is the probability of moving from state \(x\) to state \(x'\) when action
+\(u\) is applied.\\
+For every fixed state-action pair \((x,u)\), the transition probabilities satisfy
+\[
+P^u_{x,x'} \ge 0,
+\qquad
+\sum_{x'\in\cX} P^u_{x,x'} = 1.
+\]
+The Markov property means precisely that
+\[
+\Prob[x_{k+1}=x' \mid x_k,u_k,x_{k-1},u_{k-1},\dots,x_0]
+=
+\Prob[x_{k+1}=x' \mid x_k,u_k].
+\]
+In words, the distribution of the next state depends only on the current state and current
+action, not on how the system reached the current state.
+
+The immediate cost is a function
+\[
+c:\cX \times \cU \times \cX \to \R,
+\]
+where
+\[
+c(x,u,x')
+\]
+is the cost incurred when the system is in state \(x\), action \(u\) is chosen, and the next state
+turns out to be \(x'\). Since \(x'\) is random, it is useful to define the expected one-stage cost
+\[
+C_x^u
+:=
+\E[c(x,u,x_{k+1}) \mid x_k=x,\ u_k=u]
+=
+\sum_{x'\in\cX} P^u_{x,x'} c(x,u,x').
+\]
+
+\begin{theorembox}[Finite MDP]
+A finite Markov Decision Process is described by
+\[
+(\cX,\cU,P,c),
+\]
+where (\cX) is a finite state space, \(\cU\) is a finite action space, \((P^u_{x,x'})\) are the
+transition probabilities, and \((c(x,u,x'))\) is the one-step cost.
+\end{theorembox}
+
+\subsubsection{Policies}
+
+The control design problem for an MDP consists in selecting actions based on the current state.
+This is done through a policy. A \textbf{deterministic policy} is a map
+\[
+\mu:\cX \to \cU.
+\]
+If the system is in state \(x\), the controller applies
+\[
+u = \mu(x).
+\]
+Thus a deterministic policy assigns exactly one action to each state.\\
+
+A \textbf{stochastic policy}, also called a mixed policy, assigns a probability distribution over actions:
+\[
+\pi:\cX \times \cU \to [0,1],
+\]
+where
+\[
+\pi(x,u) = \Prob[u_k=u \mid x_k=x].
+\]
+For every state \(x\),
+\[
+\pi(x,u)\ge 0,
+\qquad
+\sum_{u\in\cU}\pi(x,u)=1.
+\]
+Thus, when the system is in state \(x\), the action is sampled according to the probabilities
+\(\pi(x,u)\).
+
+Deterministic policies are a special case of stochastic policies. Indeed, a deterministic policy
+\(\mu\) corresponds to the stochastic policy
+\[
+\pi(x,u)
+=
+\begin{cases}
+1, & u=\mu(x),\
+0, & u\neq \mu(x).
+\end{cases}
+\]
+In many control applications, one ultimately wants a deterministic controller. Nevertheless, the
+stochastic formulation is very convenient mathematically, because it allows us to write policy
+optimization problems as optimization problems over probability distributions. This viewpoint
+will also be important when discussing learning-based methods.
+
+\subsection{Finite-horizon dynamic programming}
+\subsubsection{Finite-horizon sequential decision problems}
+
+We now consider an MDP evolving through time. The index \(k\) denotes the time step. At time
+\(k\), the system is in state \(x_k\in\cX\), the controller selects an action \(u_k\in\cU\), and
+the next state \(x_{k+1}\) is generated according to the transition probabilities
+\[
+\Prob[x_{k+1}=x' \mid x_k=x,\ u_k=u] = P^u_{x,x'}.
+\]
+The one-stage cost incurred at time \(k\) is
+\[
+c_k = c(x_k,u_k,x_{k+1}).
+\]
+Thus \(c_k\) is the cost paid when the system moves from \(x_k\) to \(x_{k+1}\) under the
+input \(u_k\).
+
+As control designers, we are interested in choosing a policy that gives good performance over a
+time horizon. In a finite-horizon problem, a natural performance index is
+\[
+\sum_{k=0}^{K} c_k.
+\]
+Since the system is stochastic, this quantity is random. Therefore, for a policy sequence
+\[
+\pi_0,\pi_1,\dots,\pi_K,
+\]
+we evaluate performance through the conditional expected cost
+\[
+V^\pi(x)
+=
+\E\left[
+\sum_{k=0}^{K} c_k
+\ \middle|\ x_0=x
+\right].
+\]
+The goal is to find a policy sequence that minimizes this expected cumulative cost.
+
+\subsubsection{Dynamic programming recursion for a fixed policy}
+
+To solve the finite-horizon problem recursively, we introduce the value function from an
+intermediate time \(k\):
+\[
+V_k^\pi(x)
+=
+\E\left[
+\sum_{i=k}^{K} c_i
+\ \middle|\ x_k=x
+\right].
+\]
+This quantity represents the expected future cost from time \(k\) to the end of the horizon,
+assuming that the system is currently in state \(x\) and that the policy sequence
+\[
+\pi_k,\pi_{k+1},\dots,\pi_K
+\]
+is used from time \(k\) onward.
+
+The key point is that the value function can be written recursively. Indeed,
+\[
+V_k^\pi(x)
+=
+\E\left[
+\sum_{i=k}^{K} c_i
+\ \middle|\ x_k=x
+\right]
+\]
+can be split into the immediate cost at time \(k\) and the future cost from time \(k+1\):
+\[
+V_k^\pi(x)
+=
+\E\left[
+c_k+\sum_{i=k+1}^{K} c_i
+\ \middle|\ x_k=x
+\right].
+\]
+Now we condition on the action \(u\) chosen at state \(x\), and on the next state \(x'\). The
+policy chooses action \(u\) with probability \(\pi_k(x,u)\), and the system moves to \(x'\) with
+probability \(P^u_{x,x'}\). Therefore,
+\[
+V_k^\pi(x)
+=
+\sum_{u\in\cU}\pi_k(x,u)
+\left[
+C_x^u
++
+\sum_{x'\in\cX}P^u_{x,x'}
+\E\left[
+\sum_{i=k+1}^{K}c_i
+\ \middle|\ x_{k+1}=x'
+\right]
+\right],
+\]
+where
+\[
+C_x^u
+=
+\E[c_k\mid x_k=x,\ u_k=u]
+\]
+is the expected immediate cost when action \(u\) is applied in state \(x\).
+
+By definition of the value function at the next time step, we have
+\[
+\E\left[
+\sum_{i=k+1}^{K}c_i
+\ \middle|\ x_{k+1}=x'
+\right]
+=
+V_{k+1}^\pi(x').
+\]
+Hence the recursion becomes
+\[
+V_k^\pi(x)
+=
+\sum_{u\in\cU}\pi_k(x,u)
+\left[
+C_x^u
++
+\sum_{x'\in\cX}P^u_{x,x'}V_{k+1}^\pi(x')
+\right].
+\]
+This is the dynamic programming recursion for the value of a fixed policy.
+
+The recursion should be read backward in time. At the final stage, only the last stage cost
+remains. Equivalently, one can set
+\[
+V_{K+1}^\pi(x)=0
+\]
+and apply the same recursion for \(k=K,K-1,\dots,0\). Thus the finite-horizon value function is
+computed by backward induction.
+
+\subsubsection{Bellman's optimality principle and backward induction}
+
+The optimal value from stage \(k\) is defined as the minimum expected cost that can be achieved
+from state \(x\):
+\[
+V_k^\star(x)
+=
+\min_{\pi_k,\pi_{k+1},\dots,\pi_K}
+\E\left[
+\sum_{i=k}^{K}c_i
+\ \middle|\ x_k=x
+\right].
+\]
+By Bellman's optimality principle, once the first action has been selected and the next state has
+been reached, the remaining decisions must be optimal for the subproblem starting from that
+new state. Therefore the optimal value satisfies
+\[
+V_k^\star(x)
+=
+\min_{\pi_k(x,\cdot)}
+\sum_{u\in\cU}\pi_k(x,u)
+\left[
+C_x^u
++
+\sum_{x'\in\cX}P^u_{x,x'}V_{k+1}^\star(x')
+\right].
+\]
+This equation is the stochastic analogue of the deterministic Bellman recursion. The term
+\(C_x^u\) is the immediate expected cost, while
+\[
+\sum_{x'\in\cX}P^u_{x,x'}V_{k+1}^\star(x')
+\]
+is the expected optimal future cost after applying action \(u\).
+
+For each fixed state \(x\), the minimization is over the probability distribution
+\(\pi_k(x,\cdot)\). Hence it is a linear program over the probability simplex
+\[
+\Delta(\cU)
+=
+\left\{
+\nu\in\R^M:
+\nu_u\ge 0,\ 
+\sum_{u\in\cU}\nu_u=1
+\right\}.
+\]
+Indeed, for fixed \(V_{k+1}^\star\), the quantity
+\[
+C_x^u+\sum_{x'\in\cX}P^u_{x,x'}V_{k+1}^\star(x')
+\]
+is just a scalar number associated with action \(u\). Therefore the objective is linear in the
+probabilities \(\pi_k(x,u)\).
+
+Since a linear function over a simplex attains its minimum at an extreme point, under the usual
+finite-state and finite-action assumptions there exists an optimal deterministic action. Thus the
+Bellman recursion can be written equivalently as
+\[
+V_k^\star(x)
+=
+\min_{u\in\cU}
+\left[
+C_x^u
++
+\sum_{x'\in\cX}P^u_{x,x'}V_{k+1}^\star(x')
+\right].
+\]
+An optimal deterministic policy is then obtained by selecting
+\[
+\mu_k^\star(x)
+\in
+\argmin_{u\in\cU}
+\left[
+C_x^u
++
+\sum_{x'\in\cX}P^u_{x,x'}V_{k+1}^\star(x')
+\right].
+\]
+
+\begin{theorembox}[Finite-horizon Bellman recursion]
+For a finite-horizon MDP, set \(V_{K+1}^\star(x)=0\). Then, for
+\(k=K,K-1,\dots,0\),
+\[
+V_k^\star(x)
+=
+\min_{\pi_k(x,\cdot)}
+\sum_{u\in\cU}\pi_k(x,u)
+\left[
+C_x^u
++
+\sum_{x'\in\cX}P^u_{x,x'}V_{k+1}^\star(x')
+\right].
+\]
+Equivalently, since an optimal deterministic action exists,
+\[
+V_k^\star(x)
+=
+\min_{u\in\cU}
+\left[
+C_x^u
++
+\sum_{x'\in\cX}P^u_{x,x'}V_{k+1}^\star(x')
+\right].
+\]
+\end{theorembox}
+
+The finite-horizon problem is therefore solved by backward induction:
+\begin{itemize}
+    \item \(V_{K+1}^\star\) acts as the base case;
+    \item \(K+1\) backward steps are performed;
+    \item at each step, one policy \(\pi_k\) is found;
+    \item for each state \(x\), the backward step is a linear program over the action
+    probabilities;
+    \item under weak conditions, the optimal policy can be chosen deterministic.
+\end{itemize}
+
+This is a very general method: the state space is discrete, the dynamics may be nonlinear, and
+the evolution is stochastic. The catch is computational. If the state space is very large, then
+the value \(V_k^\star(x)\) must be computed and stored for many states, and this quickly becomes
+expensive. This is the usual curse of dimensionality of dynamic programming.
+
+\subsection{Infinite-horizon discounted MDPs}
+\subsubsection{Stationary problems and discounted cost}
+
+In many MDP problems, there is no natural final time. For instance, a traffic light controller is
+not designed to operate only until a fixed terminal time; it should run continuously. This leads
+to infinite-horizon problems.
+
+In the infinite-horizon setting, we typically focus on stationary problems:
+\begin{itemize}
+    \item the transition probabilities do not depend on time;
+    \item the expected cost \(C_x^u\) does not depend on time;
+    \item the policy \(\pi\) is time invariant.
+\end{itemize}
+Thus the same policy is used at every time step:
+\[
+\pi(x,u)=\Prob[u_k=u\mid x_k=x],
+\qquad k=0,1,2,\dots
+\]
+
+A standard infinite-horizon performance index is the discounted cost
+\[
+J
+=
+\sum_{k=0}^{\infty}\gamma^k c_k,
+\]
+where
+\[
+0\le \gamma <1
+\]
+is the discount factor.
+
+\subsubsection{Discount factor}
+
+The discount factor has several interpretations.
+
+From a mathematical perspective, the condition \(\gamma<1\) ensures that the infinite sum is
+finite, provided that the one-stage costs remain bounded. Indeed, the weights
+\[
+1,\gamma,\gamma^2,\dots
+\]
+form a convergent geometric sequence.
+
+In some applications, the discount factor represents the lower impact of future costs. For
+example, in economics, money spent later may be considered less costly than money spent today,
+because money available today could be invested.
+
+Another interpretation is probabilistic. The factor \(\gamma\) can be seen as a proxy for a
+Bernoulli termination probability. If at each time step the process continues with probability
+\(\gamma\), then future costs are weighted by the probability that the process has not yet
+terminated.
+
+The extreme cases are also informative:
+\begin{itemize}
+    \item if \(\gamma=0\), only the immediate cost is considered;
+    \item if \(0<\gamma<1\), the controller balances immediate cost and future cost;
+    \item if \(\gamma\) is close to \(1\), future costs become almost as important as current costs.
+\end{itemize}
+
+\subsubsection{Closed-loop MDP and stationary distribution}
+
+Once a policy \(\pi\) is fixed, the MDP becomes a Markov chain. Indeed, the action is no longer
+a free decision variable: it is sampled according to the policy. Therefore, the transition
+probability from \(x\) to \(x'\) under the closed-loop policy is
+\[
+P^\pi_{x,x'}
+=
+\sum_{u\in\cU}
+\Prob[x'\mid x,u]\Prob[u\mid x]
+=
+\sum_{u\in\cU}
+\pi(x,u)P^u_{x,x'}.
+\]
+The matrix \(P^\pi\) is the transition matrix of the closed-loop Markov chain.
+
+Let \(d_k(x)\) be the probability that the system is in state \(x\) at time \(k\). If \(d_k\) is
+written as a column vector, then the distribution evolves as
+\[
+d_{k+1}
+=
+(P^\pi)^\top d_k.
+\]
+Equivalently, if distributions are written as row vectors, then
+\[
+d_{k+1}^\top
+=
+d_k^\top P^\pi.
+\]
+This evolution is linear in the probability distribution.
+
+A stationary distribution for the closed-loop Markov chain is a probability vector
+\(\bar d_\pi\) satisfying
+\[
+\bar d_\pi^\top
+=
+\bar d_\pi^\top P^\pi.
+\]
+Thus \(\bar d_\pi\) is a left eigenvector of \(P^\pi\) associated with the eigenvalue \(1\),
+normalized so that its entries sum to one. The component \(\bar d_\pi(x)\) gives the steady-state
+probability that the system is in state \(x\).
+
+If the Markov chain is ergodic, meaning that every state can be reached from every other state
+through some path, then this stationary distribution is unique and describes the long-run
+fraction of time spent in each state.
+
+\subsubsection{Closed-loop queue example}
+
+Consider again the traffic-light queue example, with states
+\[
+\cX=\{0,1,2,3\}.
+\]
+Suppose we use the deterministic policy
+\[
+\mu(q)
+=
+\begin{cases}
+\text{green} & \text{if } q\ge 3,\\
+\text{red} & \text{otherwise}.
+\end{cases}
+\]
+Hence the light is red for \(q=0,1,2\), and it turns green when the queue reaches length \(3\).
+
+Using the state ordering \(0,1,2,3\), the closed-loop transition matrix is
+\[
+P^\pi
+=
+\begin{bmatrix}
+1-p & p   & 0   & 0\\
+0   & 1-p & p   & 0\\
+0   & 0   & 1-p & p\\
+1-p & p   & 0   & 0
+\end{bmatrix}.
+\]
+The first row means that, from queue length \(0\), the queue stays at \(0\) with probability
+\(1-p\) and moves to \(1\) with probability \(p\). The same logic applies to queue lengths
+\(1\) and \(2\). The last row is different because, when \(q=3\), the light is green and three
+cars are served; after that, either no new car arrives and the next queue length is \(0\), or one
+new car arrives and the next queue length is \(1\).
+
+The stationary distribution is obtained by solving
+\[
+\bar d_\pi^\top
+=
+\bar d_\pi^\top P^\pi
+\]
+together with the normalization condition
+\[
+\sum_{x\in\cX}\bar d_\pi(x)=1.
+\]
+For example, if \(p=0.2\), one obtains approximately
+\[
+\bar d_\pi
+=
+\begin{bmatrix}
+0.267\\
+0.333\\
+0.333\\
+0.067
+\end{bmatrix}.
+\]
+Therefore, under this policy, the queue is empty about \(26.7\%\) of the time, has one car about
+\(33.3\%\) of the time, has two cars about \(33.3\%\) of the time, and has three cars about
+\(6.7\%\) of the time.
+
+\subsection{Policy evaluation and Bellman optimality}
+\subsubsection{Infinite-horizon value of a policy}
+
+For a fixed stationary policy \(\pi\), the infinite-horizon discounted value is defined as
+\[
+V^\pi(x)
+=
+\E\left[
+\sum_{k=0}^{\infty}\gamma^k c_k
+\ \middle|\ x_0=x
+\right].
+\]
+This is the conditional expected future cost when the process starts from state \(x\) and policy
+\(\pi\) is used forever.
+
+The value of a policy satisfies the discounted Bellman equation
+\[
+V^\pi(x)
+=
+\sum_{u\in\cU}\pi(x,u)
+\left[
+C_x^u
++
+\gamma
+\sum_{x'\in\cX}P^u_{x,x'}V^\pi(x')
+\right].
+\]
+To see why, split the infinite-horizon sum into the immediate cost and the discounted future
+cost:
+\[
+V^\pi(x)
+=
+\E\left[
+c_0+\gamma\sum_{k=1}^{\infty}\gamma^{k-1}c_k
+\ \middle|\ x_0=x
+\right].
+\]
+After the first transition, the expected remaining discounted cost is exactly \(V^\pi(x_1)\).
+Conditioning on the action \(u\) and on the next state \(x'\) gives the Bellman equation above.
+
+This equation is a consistency equation. It says that the value of a state must be equal to the
+expected immediate cost plus the discounted value of the next state. The system dynamics are
+encoded in \(P^u_{x,x'}\), while the cost function is encoded in \(C_x^u\).
+
+This interpretation is particularly important in learning. The value \(V^\pi(x)\) is a predictor
+of the quality of a candidate policy. The Bellman equation decomposes this predictor into two
+parts:
+\begin{itemize}
+    \item the immediate observable cost \(C_x^u\);
+    \item the estimate of future cost \(V^\pi(x')\).
+\end{itemize}
+
+\subsubsection{Computational complexity of policy evaluation}
+
+For a fixed policy \(\pi\), define the expected cost vector
+\[
+C^\pi(x)
+=
+\sum_{u\in\cU}\pi(x,u)C_x^u
+\]
+and the closed-loop transition matrix
+\[
+P^\pi_{x,x'}
+=
+\sum_{u\in\cU}\pi(x,u)P^u_{x,x'}.
+\]
+Then the discounted Bellman equation can be written in vector form as
+\[
+V^\pi
+=
+C^\pi+\gamma P^\pi V^\pi.
+\]
+Rearranging gives
+\[
+(I-\gamma P^\pi)V^\pi
+=
+C^\pi,
+\]
+and therefore
+\[
+V^\pi
+=
+(I-\gamma P^\pi)^{-1}C^\pi.
+\]
+
+\begin{theorembox}[Policy evaluation]
+For a fixed stationary policy \(\pi\), the value function is the unique solution of
+\[
+V^\pi
+=
+C^\pi+\gamma P^\pi V^\pi.
+\]
+Equivalently,
+\[
+V^\pi
+=
+(I-\gamma P^\pi)^{-1}C^\pi.
+\]
+\end{theorembox}
+
+The matrix \(I-\gamma P^\pi\) is invertible for \(\gamma\in[0,1)\). Intuitively, the eigenvalues
+of \(P^\pi\) lie in the unit disk for a stochastic matrix, and multiplying by \(\gamma<1\) moves
+them strictly inside the unit disk. Thus \(1\) cannot be an eigenvalue of \(\gamma P^\pi\), and
+\(I-\gamma P^\pi\) is nonsingular.
+
+If the MDP has \(N\) states, the Bellman equation for a fixed policy is a system of \(N\)
+linear equations. Solving it directly can be computationally expensive for large systems. In a
+dense representation, the cost is on the order of
+\[
+O(N^3+N^2M),
+\]
+where the \(O(N^3)\) term comes from solving the linear system and the \(O(N^2M)\) term comes
+from constructing the closed-loop quantities from all state-action transition matrices.
+
+As an alternative, one can iteratively update the Bellman equation. This is possible because the
+discounted Bellman operator for a fixed policy is contractive when \(\gamma<1\).
+
+\subsubsection{Queue example for policy evaluation}
+
+For the queue example with the policy described above, the closed-loop matrix is
+\[
+P^\pi
+=
+\begin{bmatrix}
+1-p & p   & 0   & 0\\
+0   & 1-p & p   & 0\\
+0   & 0   & 1-p & p\\
+1-p & p   & 0   & 0
+\end{bmatrix}.
+\]
+If the cost is the number of cars in the queue, then
+\[
+C^\pi
+=
+\begin{bmatrix}
+0\\
+1\\
+2\\
+3
+\end{bmatrix}.
+\]
+The value of the policy is therefore
+\[
+V^\pi
+=
+(I-\gamma P^\pi)^{-1}C^\pi.
+\]
+This gives, for each initial queue length, the expected discounted total number of cars in the
+queue when the policy is used forever.
+
+\subsubsection{Bellman principle for infinite-horizon MDPs}
+
+The optimal value is defined as the best value achievable among all policies:
+\[
+V^\star(x)
+=
+\min_{\textcolor{red}{\pi}} V^{\textcolor{red}{\pi}} (x).
+\]
+Using the Bellman equation for a policy, we can write
+\[
+V^\star(x)
+=
+\min_{\textcolor{red}{\pi}}
+\sum_{u\in\cU}\textcolor{red}{\pi(x,u)}
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^{\textcolor{red}{\pi}}(x')
+\right].
+\]
+Bellman's optimality principle turns this into a recursive equation for \(V^\star\):
+\[
+\textcolor{blue}{V^\star(x)}
+=
+\min_{\textcolor{red}{\pi}}
+\sum_{u\in\cU}\textcolor{red}{\pi(x,u)}
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}\textcolor{blue}{V^\star(x')}
+\right].
+\]
+As before, the minimization is linear in the action probabilities \(\pi(x,u)\). Therefore, if the
+minimum is achieved at a deterministic policy, the equation is equivalent to
+\[
+\textcolor{blue}{V^\star(x)}
+=
+\min_{\textcolor{red}{u}\in\cU}
+\left[
+C_x^{\textcolor{red}{u}}
++
+\gamma\sum_{x'\in\cX}P^{\textcolor{red}{u}}_{x,x'}\textcolor{blue}{V^\star(x')}
+\right].
+\]
+This is a system of \(N\) nonlinear equations. The nonlinearity does not come from nonlinear
+dynamics, but from the minimum operator over the finite action set.
+
+\begin{theorembox}[Infinite-horizon Bellman optimality equation]
+The optimal value function of a discounted finite MDP satisfies
+\[
+V^\star(x)
+=
+\min_{u\in\cU}
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^\star(x')
+\right],
+\qquad x\in\cX.
+\]
+An optimal deterministic policy is obtained by choosing
+\[
+\mu^\star(x)
+\in
+\argmin_{u\in\cU}
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^\star(x')
+\right].
+\]
+\end{theorembox}
+
+\subsection{Iterative computation of the optimal policy}
+\subsubsection{Greedy policy improvement}
+The Bellman optimality equation characterizes the optimal value function, but it does not
+immediately give a practical way to compute the optimal policy. We now discuss two classical
+iterative methods for doing this: policy iteration and value iteration.
+
+The first ingredient is \textbf{policy evaluation}. Given a policy \(\pi\), we can compute the value
+function \(V^\pi\) associated with that policy by solving the discounted Bellman equation
+\[
+V^\pi
+=
+C^\pi+\gamma P^\pi V^\pi.
+\]
+Equivalently,
+\[
+V^\pi
+=
+(I-\gamma P^\pi)^{-1}C^\pi.
+\]
+This step tells us how good the current policy is.
+
+At the same time, once we know the value \(V^\pi\), we can try to improve the policy. The idea
+is to ask the following question: if the system is currently in state \(x\), can we reduce the cost
+by deviating from the current policy for one step, and then following the old policy again from
+the next state onward?
+
+For a candidate stochastic action distribution \(\nu(x,\cdot)\in\Delta(\cU)\), the one-step
+lookahead cost is
+\[
+\sum_{u\in\cU}\nu(x,u)
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^\pi(x')
+\right].
+\]
+Therefore, the improved policy is obtained by solving
+\[
+\pi'(x,\cdot)
+\in
+\argmin_{\nu(x,\cdot)\in\Delta(\cU)}
+\sum_{u\in\cU}\nu(x,u)
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^\pi(x')
+\right].
+\]
+Since this minimization is linear over the probability simplex, the optimizer can be chosen as
+a deterministic policy. Hence we can equivalently write
+\[
+\mu'(x)
+\in
+\argmin_{u\in\cU}
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^\pi(x')
+\right].
+\]
+The interpretation is simple: at each state \(x\), we choose the action that gives the smallest
+sum of immediate expected cost and discounted future value, assuming that after this first
+action we continue with the old policy \(\pi\).
+
+\subsubsection{Policy improvement theorem}
+
+The greedy improvement step always improves the value, unless the current policy is already
+optimal. More precisely, let \(\pi'\) be the greedy policy obtained from \(V^\pi\). Then
+\[
+V^{\pi'}(x)
+\le
+V^\pi(x)
+\qquad
+\forall x\in\cX.
+\]
+Moreover, unless \(V^\pi\) is already the optimal value, there exists at least one state \(x'\)
+such that
+\[
+V^{\pi'}(x')
+<
+V^\pi(x').
+\]
+
+\begin{theorembox}[Policy improvement theorem]
+Let \(\pi\) be a policy and let \(\pi'\) be obtained by the greedy one-step improvement with
+respect to \(V^\pi\). Then
+\[
+V^{\pi'}(x)\le V^\pi(x)
+\qquad
+\forall x\in\cX.
+\]
+If the greedy improvement is strict for some state, then the new policy is strictly better for
+at least one state. If no strict improvement is possible, then \(\pi\) is optimal.
+\end{theorembox}
+
+\paragraph{Proof.}
+We prove the inequality
+\[
+V^{\pi'}(x)\le V^\pi(x).
+\]
+By definition of the greedy policy \(\pi'\), for every state \(x\) we have
+\[
+V^\pi(x)
+\ge
+\sum_{u\in\cU}\pi'(x,u)
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^\pi(x')
+\right].
+\]
+The right-hand side is the expected value of
+\[
+c_0+\gamma V^\pi(x_1)
+\]
+when the first action is chosen according to \(\pi'\). Hence
+\[
+V^\pi(x)
+\ge
+\E_{\pi'}\left[
+c_0+\gamma V^\pi(x_1)
+\ \middle|\ x_0=x
+\right].
+\]
+Now we apply the same inequality again from the next state \(x_1\). This gives
+\[
+V^\pi(x)
+\ge
+\E_{\pi'}\left[
+c_0+\gamma\left(c_1+\gamma V^\pi(x_2)\right)
+\ \middle|\ x_0=x
+\right],
+\]
+or equivalently
+\[
+V^\pi(x)
+\ge
+\E_{\pi'}\left[
+c_0+\gamma c_1+\gamma^2V^\pi(x_2)
+\ \middle|\ x_0=x
+\right].
+\]
+Repeating the same argument recursively, we obtain
+\[
+V^\pi(x)
+\ge
+\E_{\pi'}\left[
+c_0+\gamma c_1+\gamma^2c_2+\gamma^3c_3+\cdots
+\ \middle|\ x_0=x
+\right].
+\]
+The right-hand side is precisely the value of the improved policy:
+\[
+\E_{\pi'}\left[
+c_0+\gamma c_1+\gamma^2c_2+\gamma^3c_3+\cdots
+\ \middle|\ x_0=x
+\right]
+=
+V^{\pi'}(x).
+\]
+Therefore
+\[
+V^\pi(x)\ge V^{\pi'}(x)
+\qquad
+\forall x\in\cX.
+\]
+The strict inequality follows if the greedy step gives a strict improvement for at least one
+state, while being non-worse for all the others.
+
+As a consequence, after a finite number of strict policy improvements, we reach an optimal
+policy. The reason is that there are only finitely many deterministic policies in a finite MDP,
+and policy improvement never returns to a strictly worse policy.
+
+\subsubsection{Policy iteration algorithm}
+
+Policy iteration alternates between the two operations described above:
+\begin{itemize}
+    \item evaluate the current policy;
+    \item greedily improve the current policy using the value function just computed.
+\end{itemize}
+
+\begin{theorembox}[Policy iteration algorithm]
+Initialize a policy guess
+\[
+\pi \leftarrow \pi_0.
+\]
+For each iteration:
+\begin{enumerate}
+    \item \textbf{Policy evaluation.} Compute the value \(V\) associated with the current policy
+    \(\pi\):
+    \[
+    V
+    \leftarrow
+    (I-\gamma P^\pi)^{-1}C^\pi.
+    \]
+
+    \item \textbf{Greedy policy update.} For every state \(x\), update the policy by solving
+    \[
+    \pi_{\mathrm{new}}(x,\cdot)
+    \in
+    \argmin_{\nu(x,\cdot)\in\Delta(\cU)}
+    \sum_{u\in\cU}\nu(x,u)
+    \left[
+    C_x^u
+    +
+    \gamma\sum_{x'\in\cX}P^u_{x,x'}V(x')
+    \right].
+    \]
+    Equivalently, since the minimizer can be chosen deterministic,
+    \[
+    \mu_{\mathrm{new}}(x)
+    \in
+    \argmin_{u\in\cU}
+    \left[
+    C_x^u
+    +
+    \gamma\sum_{x'\in\cX}P^u_{x,x'}V(x')
+    \right].
+    \]
+
+    \item Set
+    \[
+    \pi \leftarrow \pi_{\mathrm{new}}.
+    \]
+\end{enumerate}
+Stop when the policy no longer changes.
+\end{theorembox}
+
+The computational cost is split between the two steps. Policy evaluation is the expensive part,
+because it requires solving a system of \(N\) linear equations:
+\[
+V=(I-\gamma P^\pi)^{-1}C^\pi.
+\]
+For a dense MDP, this has complexity approximately
+\[
+O(N^3+N^2M).
+\]
+The term \(O(N^3)\) comes from solving the linear system, while the term \(O(N^2M)\) comes
+from constructing the closed-loop transition matrix and expected cost.
+
+Policy improvement is usually simpler. For each state \(x\), one compares the \(M\) possible
+actions and selects the one with smallest one-step lookahead cost. Thus the improvement step is
+essentially a minimization over \(M\) alternatives, repeated \(N\) times.
+
+The policy improvement theorem guarantees that every nontrivial iteration improves the policy.
+Since the number of deterministic policies is finite, policy iteration terminates after a finite
+number of improvements.
+
+\subsubsection{Value iteration}
+
+Policy iteration evaluates each intermediate policy exactly. An alternative is to look directly
+for a fixed point of the Bellman optimality equation.
+
+Recall that the optimal value satisfies
+\[
+V^\star(x)
+=
+\min_{\pi(x,\cdot)}
+\sum_{u\in\cU}\pi(x,u)
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^\star(x')
+\right].
+\]
+Equivalently, when the optimum is attained by a deterministic policy,
+\[
+V^\star(x)
+=
+\min_{u\in\cU}
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^\star(x')
+\right].
+\]
+
+A natural way to compute this fixed point is to start from an initial guess \(V^{(0)}\) and
+iterate the Bellman optimality equation:
+\[
+V^{(t+1)}(x)
+=
+\min_{\pi(x,\cdot)}
+\sum_{u\in\cU}\pi(x,u)
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^{(t)}(x')
+\right],
+\]
+or, equivalently,
+\[
+V^{(t+1)}(x)
+=
+\min_{u\in\cU}
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^{(t)}(x')
+\right].
+\]
+Here \(t\) is not the time index of the MDP. It is the iteration index of the algorithm.
+
+To state the convergence property compactly, define the Bellman optimality operator \(T\) as
+\[
+(TV)(x)
+=
+\min_{u\in\cU}
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V(x')
+\right].
+\]
+Then value iteration is simply
+\[
+V^{(t+1)}=TV^{(t)}.
+\]
+
+The key convergence result is that the Bellman optimality operator is a contraction in the
+infinity norm. If \(V\) and \(W\) are two value functions, then
+\[
+\norm{TV-TW}_{\infty}
+\le
+\gamma\norm{V-W}_{\infty},
+\]
+where
+\[
+\norm{V}_{\infty}
+:=
+\max_{x\in\cX}|V(x)|.
+\]
+Since \(0\le\gamma<1\), the operator \(T\) is contractive. Therefore, value iteration converges
+to the unique fixed point \(V^\star\). In particular,
+\[
+\norm{V^{(t)}-V^\star}_{\infty}
+\le
+\gamma^t\norm{V^{(0)}-V^\star}_{\infty}.
+\]
+Thus the convergence rate is governed by \(\gamma\). When \(\gamma\) is close to one, future
+costs are important, but the convergence of value iteration becomes slower.
+
+\subsubsection{Value iteration algorithm}
+
+\begin{theorembox}[Value iteration algorithm]
+Initialize a value guess
+\[
+V\leftarrow V_0.
+\]
+For each iteration, apply the Bellman iteration
+\[
+V(x)
+\leftarrow
+\min_{\pi(x,\cdot)}
+\sum_{u\in\cU}\pi(x,u)
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V(x')
+\right].
+\]
+Equivalently,
+\[
+V(x)
+\leftarrow
+\min_{u\in\cU}
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V(x')
+\right],
+\qquad x\in\cX.
+\]
+
+At convergence, extract the optimal greedy policy:
+\[
+\pi^\star(x,\cdot)
+\in
+\argmin_{\nu(x,\cdot)\in\Delta(\cU)}
+\sum_{u\in\cU}\nu(x,u)
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^\star(x')
+\right].
+\]
+Equivalently, one can extract a deterministic optimal policy by choosing
+\[
+\mu^\star(x)
+\in
+\argmin_{u\in\cU}
+\left[
+C_x^u
++
+\gamma\sum_{x'\in\cX}P^u_{x,x'}V^\star(x')
+\right].
+\]
+\end{theorembox}
+
+The computational cost of value iteration is different from policy iteration. Each Bellman
+iteration is usually cheaper than solving the full policy evaluation linear system. For a dense
+finite MDP, one Bellman iteration has complexity approximately
+\[
+O(N^2M).
+\]
+However, the convergence is asymptotic rather than finite, and the rate is controlled by
+\(\gamma\). Thus policy iteration usually performs fewer but more expensive iterations, while
+value iteration performs cheaper iterations but may need many of them.
