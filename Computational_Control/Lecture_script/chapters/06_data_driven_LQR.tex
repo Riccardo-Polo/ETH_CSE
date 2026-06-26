@@ -62,13 +62,20 @@ P \;=\; \mathbb E\!\left[\sum_{t=0}^{\infty} x_t x_t^\top\right].
 \]
 This matrix collects the second-order state information accumulated over the whole trajectory.
 Using the closed-loop dynamics, one obtains
-\[
+\begin{align*}
 P
-= \mathbb E[x_0x_0^\top]
+&= \mathbb E[x_0x_0^\top]
 + (A+BK)\,\mathbb E[x_0x_0^\top]\,(A+BK)^\top
-+ \cdots,
-\]
-and therefore, since $\mathbb E[x_0x_0^\top]=I$, the matrix $P$ \textbf{satisfies the Lyapunov equation}
++ (A+BK)^2\,\mathbb E[x_0x_0^\top]\,\big((A+BK)^\top\big)^2 
++ \cdots \\
+&= \mathbb{E} [x_0x_0^\top] + \sum_{k=1}^{\infty} (A+BK)^k \mathbb{E}[x_0x_0^\top] ((A+BK)^\top)^k \\
+&= \mathbb E[x_0x_0^\top] + (A+BK)\,P\,(A+BK)^\top.
+\end{align*}
+The final step is valid because one can multiply the first equation on the left by $(A+BK)$ and on the right by $(A+BK)^\top$ obtaining
+$$
+(A+BK)P(A+BK)^\top = (A+BK)\,\mathbb E[x_0x_0^\top]\,(A+BK)^\top + (A+BK)^2\,\mathbb E[x_0x_0^\top]\,\big((A+BK)^\top\big)^2 + \cdots
+$$
+Using $\mathbb E[x_0x_0^\top]=I$, we obtain the \textbf{Lyapunov equation}
 \[
 P = I + (A+BK)P(A+BK)^\top.
 \]
@@ -81,7 +88,11 @@ and $P$. Indeed, since $u_t = Kx_t$, we have
 x_t^\top Q x_t + u_t^\top R u_t
 = x_t^\top (Q + K^\top R K)x_t,
 \]
-hence summing over time and taking expectations gives
+Notice that this quantity is a scalar, so we can take the trace and change the order of the factors to obtain
+\[
+\mathrm{Tr}(x_t^\top (Q + K^\top R K)x_t) = \mathrm{Tr}((Q + K^\top R K)x_t x_t^\top).
+\]
+Hence, summing over time and taking expectations gives
 \[
 J(K)
 =
