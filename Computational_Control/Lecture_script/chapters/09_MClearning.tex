@@ -1,4 +1,4 @@
-\subsection{From model-based dynamic programming to learning}
+\subsection{From dynamic programming to model-free learning}
 
 All the algorithmic steps introduced for MDPs relied on model information, in particular on the
 transition probabilities
@@ -92,7 +92,9 @@ must collect information while also trying to achieve good performance.
 In this chapter we focus on the first viewpoint: learning from episodes. The goal is to replace
 explicit model-based policy evaluation with empirical estimates obtained from data.
 
-\subsection{The Q-function}
+\subsection{Q-functions and policy improvement}
+
+\subsubsection{Definition of the Q-function}
 
 A useful reformulation is obtained by introducing the action-value function, or Q-function. For
 a fixed policy \(\pi\), the Q-function is defined as the expected discounted future reward obtained
@@ -272,7 +274,9 @@ information: for each state, one simply chooses the action with the largest esti
 Therefore, if we can learn or estimate \(Q^\pi\) from data, we can improve the policy without
 ever explicitly estimating the transition probabilities.
 
-\subsection{Experimental policy evaluation}
+\subsection{Monte Carlo policy evaluation}
+
+\subsubsection{Empirical returns from episodes}
 
 The idea of Monte Carlo policy evaluation is to delegate the policy evaluation step to
 experiments or simulations. Suppose that the system is controlled by a fixed policy \(\pi\), and
@@ -335,7 +339,7 @@ more efficient. Each return \(g_k\) is computed using the full future tail of th
 than recursively bootstrapping from the value of the next state-action pair. This is one of the
 main differences between Monte Carlo learning and temporal-difference methods.
 
-\subsection{Exploration and exploitation}
+\subsubsection{Exploration and exploitation}
 
 If we update the policy greedily too early, we may get stuck in a suboptimal behavior. The reason
 is simple: at the beginning of learning, the estimate of \(Q^\pi\) is rough. If the policy becomes
@@ -397,7 +401,9 @@ episodes should exploit the information collected so far. If this is done proper
 probability one each relevant state-action pair is visited infinitely often, while the policy
 eventually converges to a greedy policy.
 
-\subsection{Scalability and parametrization of Q}
+\subsection{Function approximation for Q-functions}
+
+\subsubsection{Scalability limits of tabular Q-functions}
 
 In principle, for a finite MDP, one could store the Q-function in a table with one entry for each
 state-action pair. This is the tabular representation:
@@ -448,7 +454,7 @@ There are also important disadvantages:
 
 Thus parametrization is necessary for scalability, but it also introduces approximation error.
 
-\subsection{Linear parametrization}
+\subsubsection{Linear parametrization}
 
 A simple and important case is linear parametrization. More advanced parametrizations, such as
 neural networks, are often used in practice, but the linear case already contains the main idea.
@@ -492,7 +498,9 @@ The key point is that the Q-function is no longer represented by one independent
 state-action pair. Instead, all Q-values are tied together through the common parameter vector
 \(\theta\).
 
-\subsection{Projected Bellman equation}
+\subsection{Projected Bellman evaluation and approximate policy iteration}
+
+\subsubsection{Projected Bellman equation}
 
 With parametrization, we cannot generally solve the Bellman equation exactly. For a fixed policy
 \(\pi\), the Q-Bellman equation is
@@ -549,7 +557,7 @@ Q_\theta
 This equation says that \(Q_\theta\) should be the best approximation, within the chosen
 parametrized class, of its Bellman update.
 
-\subsection{Matrix form of the projected Bellman equation}
+\subsubsection{Matrix form of the projected Bellman equation}
 
 To write the projected Bellman equation in matrix form, enumerate all state-action pairs and
 stack the corresponding values into a vector
@@ -652,7 +660,7 @@ At a fixed point of the projected Bellman equation we have \(\hat\theta=\theta\)
 \]
 This gives the equation above.
 
-\subsection{Model-free computation of the projected Bellman equation}
+\subsubsection{Model-free computation from data}
 
 The equation
 \[
@@ -771,7 +779,7 @@ estimates
 Thus, the matrices appearing in the projected Bellman equation can be replaced by empirical
 averages computed directly from episodes.
 
-\subsection{Empirical interpretation of the weighted matrices}
+\subsubsection{Empirical interpretation of the weighted matrices}
 
 Let us make the connection between empirical averages and the weighted matrices even more
 explicit. Enumerate the state-action pairs by an index
@@ -877,7 +885,7 @@ Thus the matrices appearing in the projected Bellman equation can be constructed
 an episode, without explicitly estimating either the transition probabilities or the full reward
 model.
 
-\subsection{Monte Carlo learning with linear approximation}
+\subsubsection{Monte Carlo learning with linear approximation}
 
 We can now combine the previous ideas into a complete learning procedure. The method
 alternates between two steps:
@@ -984,7 +992,7 @@ The complete scheme is therefore:
     exploration.
 \end{enumerate}
 
-\subsection{Key points}
+\subsubsection{Key points}
 
 The Q-function representation is useful because it separates the two parts of policy iteration in
 a way that is well suited to learning:
