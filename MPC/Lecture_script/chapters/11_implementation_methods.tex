@@ -366,8 +366,7 @@ terminal weight \(P\) given by the solution of the algebraic Riccati equation, a
 \[
     \cX_f=\R^2.
 \]
-The resulting state space is partitioned into finitely many critical regions. In the slide example,
-the first optimal input is represented by a piecewise affine surface over the state space. The
+The resulting state space is partitioned into finitely many critical regions. The first optimal input is represented by a piecewise affine surface over the state space. The
 important point is not the exact number of regions, but the qualitative structure: the optimal
 feedback is not a single linear gain, as in unconstrained LQR. Instead, the constraints divide the
 state space into many regions, and the controller has a different affine expression in each of
@@ -549,7 +548,7 @@ tree, which identifies the critical region containing the state.
         \label{fig:explicit_mpc_log_search_6}
     \end{subfigure}
 
-    \caption{Logarithmic search for explicit MPC. The left part of each slide shows the
+    \caption{Logarithmic search for explicit MPC. The left part of shows the
     progressive localization of the state in the polyhedral partition. The right part shows the
     corresponding path in the binary search tree. Each hyperplane test eliminates a large subset
     of candidate regions.}
@@ -1267,7 +1266,7 @@ by a relaxed condition
     \lambda_i s_i=\kappa,
     \qquad \kappa>0.
 \]
-Equivalently, in the notation of the slides, the relaxed system is written as
+Equivalently, the relaxed system is written as
 \[
 \begin{aligned}
     \nabla f(x^\star)

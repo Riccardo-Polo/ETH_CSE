@@ -8,4 +8,20 @@
 
 function [Ac, Bc] = generate_system_cont_cwo(params)
     % YOUR CODE HERE
+    mu = params.model.GravitationalParameter;
+    R = params.model.TargetRadius;
+    wn = sqrt(mu/R^3);
+    Ac = [0 0 0 1 0 0
+          0 0 0 0 1 0
+          0 0 0 0 0 1
+          3* wn^2 0 0 0 2*wn 0
+          0 0 0 -2*wn 0 0
+          0 0 -wn^2 0 0 0];
+
+    Bc = 1/(params.model.Mass)*[0 0 0
+          0 0 0
+          0 0 0
+          1 0 0
+          0 1 0
+          0 0 1];
 end

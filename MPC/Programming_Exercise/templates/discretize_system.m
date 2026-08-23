@@ -8,4 +8,7 @@
 
 function [At, Bt] = discretize_system(Ac, Bc, params)
     % YOUR CODE HERE
+    sysc = ss(Ac,Bc, [] , [] );
+    sysd = c2d(sysc,params.model.TimeStep,'zoh');
+    [At,Bt, Ct, Dt] = ssdata(sysd);
 end

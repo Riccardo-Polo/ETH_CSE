@@ -609,8 +609,7 @@ u(k)
 \end{bmatrix}
 \left(-y(k)+C\hat x(k)+C_d\hat d(k)\right).
 \]
-Equivalently, the correction term is proportional to the output prediction error. The sign
-convention above follows the slides: the innovation is written as
+Equivalently, the correction term is proportional to the output prediction error. The innovation is written as
 \[
     -y(k)+C\hat x(k)+C_d\hat d(k).
 \]
@@ -785,8 +784,7 @@ current estimate along the prediction horizon:
 \]
 Therefore, as in the nominal tracking case, the problem can also be rewritten in deviation
 variables around the disturbance-corrected target.\\
-The resulting closed-loop architecture has the same block structure shown in the slides. The
-plant produces the measured output \(y\). The estimator uses \(y\) and the applied input \(u\) to
+The plant produces the measured output \(y\). The estimator uses \(y\) and the applied input \(u\) to
 produce \(\hat x\) and \(\hat d\). The target selector uses the reference \(r\) and the disturbance
 estimate \(\hat d\) to compute \((x_s,u_s)\). The MPC regulator then computes the input \(u\)
 that drives the estimated state toward the corrected target.
@@ -855,7 +853,7 @@ which MPC regulates.
 
 \subsubsection{Example: double integrator}
 
-The slides illustrate the construction on the double integrator. The first set point is \(r=0\),
+We illustrate the construction on the double integrator. The first set point is \(r=0\),
 while the second set point is \(r=3\). The system has one output, one input, and one modeled
 constant disturbance.\\
 For standard tracking, the nominal model is
@@ -1448,7 +1446,7 @@ where \(\norm{\cdot}_D\) is the dual norm of the chosen norm. In particular, the
 
 \subsubsection{Example system}
 
-The slides illustrate the effect of different slack penalties on a third-order nonminimum-phase
+We illustrate the effect of different slack penalties on a third-order nonminimum-phase
 system:
 \[
     x(k+1)
@@ -1507,7 +1505,7 @@ We first consider a purely quadratic slack penalty:
 This choice gives a well-posed quadratic program, because the cost remains quadratic and the
 Hessian can be made positive definite. Increasing \(S\) makes the violation more expensive and
 therefore hardens the soft constraint.\\
-The simulation in the slides uses the initial condition
+The simulation uses the initial condition
 \[
     x(0)=
     \begin{bmatrix}
@@ -1545,7 +1543,7 @@ We now add a linear penalty term:
 The linear term allows exact penalty behavior. If \(v\) is sufficiently large and the hard
 constraint can be satisfied, the optimizer chooses zero slack. Thus, constraints are satisfied
 whenever possible.\\
-The slides first show a case with initial condition
+We first show a case with initial condition
 \[
     x(0)=
     \begin{bmatrix}
@@ -1593,8 +1591,7 @@ cause numerical problems and make tuning difficult.
 
 \subsubsection{Simplification by separation of objectives}
 
-The slides also present a useful simplification: instead of combining performance and violation
-penalties in one optimization problem, one can separate the objectives into two steps.\\
+Instead of combining performance and violation penalties in one optimization problem, one can separate the objectives into two steps.\\
 First, compute the smallest constraint relaxation over the horizon:
 \[
 \begin{aligned}
